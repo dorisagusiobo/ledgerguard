@@ -7,7 +7,9 @@ authors = [
     { name = "Doris Agusiobo Echianu", email = "38115960+dorisagusiobo@users.noreply.github.com" }
 ]
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "pydantic>=2.14.1",
+]
 
 [project.scripts]
 ledgerguard = "ledgerguard:main"
