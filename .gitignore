@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.env
+.env.*
+# Synthetic data is generated, not committed (regenerate with the data script)
+data/synthetic/*
+!data/synthetic/.gitkeep
+infra/.terraform/
+infra/*.tfstate*
+infra/terraform.tfvars
+infra/.terraform.lock.hcl
+infra/tfplan
