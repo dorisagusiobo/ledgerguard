@@ -9,7 +9,7 @@ The repository is a scaffold; do not describe planned features as implemented.
 ## Commands
 
 - `uv sync` — install locked project and development dependencies.
-- `uv run pytest -q` — run tests; currently exits 5 (no tests collected), not a pass.
+- `uv run pytest -q` — run offline tests; exit 5 means “no tests,” not a pass.
 - Add commands only after they exist and have been verified.
 
 ## Layout
