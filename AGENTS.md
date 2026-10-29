@@ -10,6 +10,7 @@ The repository is a scaffold; do not describe planned features as implemented.
 
 - `uv sync` — install locked project and development dependencies.
 - `uv run pytest -q` — run offline tests; exit 5 means “no tests,” not a pass.
+- `uv run python -m ledgerguard.synthetic --seed 7 --out data/synthetic` — generate JSON fixtures; use an empty output directory.
 - Add commands only after they exist and have been verified.
 
 ## Layout
