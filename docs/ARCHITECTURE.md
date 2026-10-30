@@ -137,4 +137,5 @@ recorded model responses; live-model evaluations run before releases within a se
 
 Not part of Version 1: auditor and admin roles, a nightly schedule with email summaries,
 spending forecasts, MCP tool servers, a reviewer agent, expense receipts and
-multi-currency support.
+multi-currency support, and document IDs so same-number resubmissions can be reported
+as duplicates.
