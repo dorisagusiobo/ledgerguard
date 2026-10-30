@@ -121,6 +121,11 @@ def revision() -> str | None:
         return None
 
 
+def load_expected(data: Path) -> list[dict]:
+    """Keep answer-key access at the scoring boundary, never in model inputs."""
+    return json.loads((Path(data) / 'answer_key/expected_findings.json').read_text())
+
+
 def evaluate(data: Path, split: str = 'dev') -> dict:
     data = Path(data)
     splits = json.loads((data / 'splits.json').read_text())
@@ -130,7 +135,7 @@ def evaluate(data: Path, split: str = 'dev') -> dict:
     invoices = [i for i in inputs.invoices if splits[i.invoice_number] == split]
     result = run_rules(invoices, inputs.contracts, inputs.history, inputs.policy_clauses)
     # Answers enter only the scorer, never rules or their loader.
-    answers = json.loads((data / 'answer_key/expected_findings.json').read_text())
+    answers = load_expected(data)
     report = score(result.findings, answers, splits, split, result.needs_review)
     metadata_path = data / 'metadata.json'
     metadata = json.loads(metadata_path.read_text()) if metadata_path.exists() else {}

@@ -12,3 +12,6 @@ infra/*.tfstate*
 infra/terraform.tfvars
 infra/.terraform.lock.hcl
 infra/tfplan
+
+# Local extraction audit logs and evaluation reports
+runs/
