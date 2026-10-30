@@ -150,6 +150,7 @@ def generate(seed: int, out: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(data, indent=2, sort_keys=True) + '\n')
 
+    write('metadata.json', {'seed': seed})
     write('vendors.json', vendors)
     write('contracts.json', contracts)
     write('history.json', history)
