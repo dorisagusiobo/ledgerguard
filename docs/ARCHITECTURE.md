@@ -1,7 +1,9 @@
 # LedgerGuard architecture
 
-This document describes the planned Version 1. The repository currently contains an
-initial Python package scaffold; the components below are not implemented yet.
+This document describes the planned Version 1. Built so far: the synthetic data and PDF
+generator, the extractor, the rule checks, the scorer, and the governance gateway for
+model calls (budgets are in memory, not yet a persistent monthly ledger). The policy
+checker, investigator, database, review queue and deployment are not built yet.
 
 ## 1. Problem
 
@@ -27,7 +29,7 @@ Invoice PDF → Extractor → Rule checks → Policy checker → Investigator �
                         allow / block / needs approval · log · budget
 ```
 
-1. **Extractor — one AI call plus code.** Claude reads the PDF into a strict schema
+1. **Extractor — one AI call plus code.** The model reads the PDF into a strict schema
    (vendor, invoice number, dates, currency, line items, totals) with the page and source
    text for each field. Code validates the schema and the arithmetic and sends uncertain
    extractions to review.
@@ -35,7 +37,7 @@ Invoice PDF → Extractor → Rule checks → Policy checker → Investigator �
    duplicates, contract rate differences, approval thresholds, possible split purchases,
    and amounts far above a vendor's usual spending. Amounts use decimal arithmetic.
 3. **Policy checker — code plus one AI call.** Code retrieves the relevant policy and
-   contract clauses from pgvector, then one Claude call compares the invoice with those
+   contract clauses from pgvector, then one model call compares the invoice with those
    clauses and proposes findings that cite the exact clause and document version.
 4. **Investigator — the one agent, flagged invoices only.** For invoices with at least one
    finding, the agent uses a small set of read-only tools (vendor history, related
@@ -56,7 +58,7 @@ approval, and writes the result to the audit log before anything runs.
 | --- | --- |
 | Python + FastAPI | Rule checks, financial calculations, and the API for ingestion, findings and decisions |
 | LangGraph | Workflow state, the bounded investigator loop, and the pause for human review |
-| Claude Sonnet 4.6 on Amazon Bedrock | Extraction, policy comparison and investigation, called through the Anthropic SDK |
+| Amazon Bedrock (Converse API) | Model calls through the gateway; the model for each step is chosen by evaluation. Extraction uses Amazon Nova 2 Lite; Claude Sonnet 4.6 is the default for policy comparison and investigation until those steps are evaluated |
 | Postgres + pgvector | Records, audit log, LangGraph checkpoints and clause search (Neon free tier, or local Docker) |
 | Next.js | Review queue and evidence viewer |
 | AWS Lambda or App Runner | Hosting for the API; choose during deployment based on run length |
@@ -128,7 +130,8 @@ recorded model responses; live-model evaluations run before releases within a se
 | --- | --- | --- |
 | LangGraph | Explicit state, a bounded agent loop, and a built-in pause for human review | Plain Python, which needs custom state and pause handling |
 | Postgres + pgvector | One database for records, audit log, checkpoints and clause search | OpenSearch Serverless; a second service, and costly at this scale |
-| Claude Sonnet 4.6 on Bedrock | Enabled on my Bedrock account and already running in production in JobScout | Direct Anthropic API, or a smaller model compared on the evaluation set |
+| Bedrock Converse API | One request format for every model, so models can be compared on the same evaluation | The Anthropic SDK, which works with Claude models only |
+| Amazon Nova 2 Lite for extraction | On the 38 `dev` invoices it matched Claude Sonnet 4.6 on every extraction and detection measure at about 1/13 the cost ($0.0011 vs $0.0138 per invoice). The synthetic PDFs are clean, one page and one line item, so harder invoices need re-evaluation | Claude Sonnet 4.6, kept available through the gateway |
 | Synthetic data only | Planted errors give known answers, and no real company data is exposed | Real invoices, which are out of scope |
 | A person approves every finding | Accountability stays with finance; model mistakes cannot cause financial actions | Fully automatic decisions |
 | Budget caps in application code | Stops spending before a call is made | AWS Budgets alone, which only alerts |

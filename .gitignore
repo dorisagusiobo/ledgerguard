@@ -5,6 +5,8 @@ __pycache__/
 .env
 .env.*
 # Synthetic data is generated, not committed (regenerate with the data script)
+data/synthetic*/
+!data/synthetic/
 data/synthetic/*
 !data/synthetic/.gitkeep
 infra/.terraform/
