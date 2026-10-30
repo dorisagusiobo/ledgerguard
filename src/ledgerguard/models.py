@@ -38,7 +38,9 @@ class Schema(BaseModel):
 
 class SourceRef(Schema):
     page: int = Field(ge=1, strict=True)
-    text: Text
+    text: Text = Field(
+        description='The full printed row, every cell, exactly: description | quantity | unit price | amount'
+    )
 
 
 class LineItem(Schema):
