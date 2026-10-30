@@ -1,6 +1,7 @@
 """Scoring separates detection, money accuracy, and clause accuracy."""
 from decimal import Decimal
 import json
+import shutil
 from pathlib import Path
 import subprocess
 import sys
@@ -10,7 +11,6 @@ import pytest
 from ledgerguard.evaluate import evaluate, render, score
 from ledgerguard.models import Citation, Finding, SourceRef
 from ledgerguard.rules import ReviewReferral
-from ledgerguard.synthetic import generate
 
 
 SPLITS = {'INV-2026-0001': 'dev', 'INV-2026-0002': 'dev',
@@ -125,9 +125,8 @@ def test_clean_flag_count_counts_invoices_not_findings():
 
 
 @pytest.mark.parametrize('seed', [7, 8, 9])
-def test_generated_dev_baseline(tmp_path, seed):
-    generate(seed, tmp_path)
-    report = evaluate(tmp_path)
+def test_generated_dev_baseline(generated, seed):
+    report = evaluate(generated(seed))
     assert report['split'] == 'dev'
     assert report['overall'] == {
         'expected': 14, 'caught': 12, 'missed': 2, 'false_flags': 0,
@@ -141,9 +140,8 @@ def test_generated_dev_baseline(tmp_path, seed):
     assert report['metadata']['git_revision']
 
 
-def test_cli_defaults_to_dev_and_writes_json(tmp_path):
-    data = tmp_path / 'data'
-    generate(7, data)
+def test_cli_defaults_to_dev_and_writes_json(tmp_path, generated):
+    data = generated(7)
     output = tmp_path / 'report.json'
     result = subprocess.run([sys.executable, '-m', 'ledgerguard.evaluate', '--data', str(data),
                              '--json', str(output)], capture_output=True, text=True)
@@ -162,8 +160,8 @@ def test_cli_defaults_to_dev_and_writes_json(tmp_path):
     assert 'False flags: none' in result.stdout
 
 
-def test_legacy_dataset_does_not_invent_seed(tmp_path):
-    generate(7, tmp_path)
+def test_legacy_dataset_does_not_invent_seed(tmp_path, generated):
+    shutil.copytree(generated(7), tmp_path, dirs_exist_ok=True)
     (tmp_path / 'metadata.json').unlink()
     assert evaluate(tmp_path)['metadata']['seed'] is None
 

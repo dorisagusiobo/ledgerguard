@@ -4,6 +4,7 @@ from datetime import date
 from decimal import Decimal
 import importlib.util
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -17,21 +18,18 @@ def read(path):
 
 
 @pytest.fixture(params=[7, 8, 9])
-def dataset(tmp_path, request):
-    out = tmp_path / 'generated'
-    generate(request.param, out)
-    return out
+def dataset(generated, request):
+    return generated(request.param)
 
 
 def files(out):
     return {str(p.relative_to(out)): p.read_bytes() for p in out.rglob('*') if p.is_file()}
 
 
-def test_deterministic_and_seed_changes_output(tmp_path):
-    a, b, c = [tmp_path / name for name in ['a', 'b', 'c']]
-    generate(7, a)
+def test_deterministic_and_seed_changes_output(tmp_path, generated):
+    # One deliberate regeneration proves independent runs match byte for byte.
+    a, b, c = generated(7), tmp_path / 'repeat', generated(8)
     generate(7, b)
-    generate(8, c)
     assert files(a) == files(b)
     assert files(a) != files(c)
 
@@ -153,7 +151,14 @@ def test_every_output_passes_financial_guard(dataset):
     spec.loader.exec_module(guard)
     for path in dataset.rglob('*'):
         if path.is_file():
-            assert not guard.suspected_financial_data(path.read_text()), str(path.relative_to(dataset))
+            if path.suffix == '.pdf':
+                # Scan visible literal strings, not random PDF-internal IDs.
+                strings = re.findall(rb'\(((?:\\.|[^\\)])*)\)\s*Tj', path.read_bytes())
+                text = '\n'.join(re.sub(rb'\\([\\()])', rb'\1', s).decode('latin-1') for s in strings)
+                assert strings
+            else:
+                text = path.read_text()
+            assert not guard.suspected_financial_data(text), str(path.relative_to(dataset))
 
 
 def test_nonempty_output_refused_without_changes(dataset):
@@ -210,7 +215,7 @@ def test_policy_is_general_with_semantic_positive_and_negative_cases(dataset):
                  for answer in answers if answer['clause_id'] == 'POL-4'
                  for number in answer['invoice_numbers']
                  for item in Invoice.model_validate(read(dataset / 'invoices' / f'{number}.json')).line_items}
-    semantic = {'Reloadable spending card for staff', 'Store credit — staff rewards'}
+    semantic = {'Reloadable spending card for staff', 'Store credit - staff rewards'}
     assert semantic <= positives
     assert all(not any(word in description.lower() for word in ['gift', 'cash', 'equivalent'])
                for description in semantic)

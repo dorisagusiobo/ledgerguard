@@ -13,7 +13,6 @@ from ledgerguard.rules import (
     RuleConfig, arithmetic_checks, contract_checks, duplicate_checks, load_inputs,
     po_checks, run_rules, split_checks, unusual_checks,
 )
-from ledgerguard.synthetic import generate
 
 
 @pytest.fixture
@@ -196,8 +195,8 @@ def test_configuration_changes_thresholds(clauses):
 
 
 @pytest.mark.parametrize('seed', [7, 8, 9])
-def test_full_generated_baseline_and_loader_is_answer_blind(tmp_path, monkeypatch, seed):
-    generate(seed, tmp_path)
+def test_full_generated_baseline_and_loader_is_answer_blind(tmp_path, monkeypatch, seed, generated):
+    shutil.copytree(generated(seed), tmp_path, dirs_exist_ok=True)
     expected = json.loads((tmp_path / 'answer_key/expected_findings.json').read_text())
     shutil.rmtree(tmp_path / 'answer_key')
     original_read = Path.read_text

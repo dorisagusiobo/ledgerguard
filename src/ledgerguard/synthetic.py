@@ -8,6 +8,7 @@ from pathlib import Path
 import random
 
 from ledgerguard.models import Invoice
+from ledgerguard.pdf import line_item_source_text, render_invoice
 
 CENT = Decimal('0.01')
 POLICY = '''# Synthetic spending policy v1
@@ -76,7 +77,7 @@ def generate(seed: int, out: Path) -> None:
                   'currency': 'USD', 'subtotal': amount, 'tax': '0.00', 'total': total,
                   'line_items': [{'description': item, 'quantity': str(quantity),
                                   'unit_price': str(rate), 'amount': amount,
-                                  'source': {'page': 1, 'text': f'{item}: {quantity} units at ${rate}: ${amount}'}}]}
+                                  'source': {'page': 1, 'text': line_item_source_text(item, quantity, rate, Decimal(amount))}}]}
         invoices[number], splits[number] = record, split
         return number
 
@@ -134,7 +135,7 @@ def generate(seed: int, out: Path) -> None:
             excess = Decimal(invoices[number]['total']) - upper
             finding('unusual_amount', [number], excess, None, split)
 
-            wording = ['Reloadable spending card for staff', 'Store credit — staff rewards',
+            wording = ['Reloadable spending card for staff', 'Store credit - staff rewards',
                        'Prepaid Visa card', 'Holiday gift certificates'][block]
             number = invoice(3, range(1, 21), day + timedelta(days=43), split,
                              description=wording)
@@ -143,6 +144,7 @@ def generate(seed: int, out: Path) -> None:
 
     # Validate everything before creating any output files.
     validated = {number: Invoice.model_validate(record) for number, record in invoices.items()}
+    pdfs = {number: render_invoice(record) for number, record in validated.items()}
     out.mkdir(parents=True, exist_ok=True)
 
     def write(name, data):
@@ -158,6 +160,9 @@ def generate(seed: int, out: Path) -> None:
     (out / 'policy.md').write_text(POLICY)
     for number, record in validated.items():
         write(f'invoices/{number}.json', record.model_dump(mode='json'))
+    (out / 'invoices_pdf').mkdir()
+    for number, content in pdfs.items():
+        (out / 'invoices_pdf' / f'{number}.pdf').write_bytes(content)
     write('answer_key/expected_findings.json', answers)
 
 
