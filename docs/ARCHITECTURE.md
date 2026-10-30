@@ -96,6 +96,7 @@ never invents a citation.
   of producing a confident, unsupported finding.
 - **Audit trail.** Every model call, tool call, gateway result and decision is logged.
   The application cannot edit or delete audit entries. Secrets are never logged.
+- **Run definition.** A run is one invoice through extraction, policy checking and investigation, sharing the $0.50 and 20-call caps; live evaluations require a separate explicit batch budget passed as `--max-cost`, in addition to invoice and monthly limits.
 - **Cost limits.** $10 per month for model calls, $0.50 and at most 20 model calls per
   run, enforced in code before each call. The monthly limit wins: when it is reached, no
   more model calls run until the next month. AWS Budgets alerts at 80% and 100% are a
