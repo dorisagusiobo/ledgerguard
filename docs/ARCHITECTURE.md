@@ -4,8 +4,9 @@ This document describes the planned Version 1. Built so far: the synthetic data 
 generator, extractor, rule checks, policy checker, bounded investigator and read-only
 tools, scorer, per-step and pipeline evaluations, and governance gateway. Postgres
 persistence, an independent audit sink, a persistent monthly ledger and investigator
-checkpoints are implemented, along with the five-route review API. The review queue UI
-and deployment are not built yet, and pgvector clause retrieval is deferred (see step 3).
+checkpoints are implemented, along with the five-route review API and a local Next.js
+review screen. Deployment is not built yet, and pgvector clause retrieval is deferred
+(see step 3).
 
 ## 1. Problem
 
@@ -54,7 +55,8 @@ Invoice PDF → Extractor → Rule checks → Policy checker → Investigator �
    6 model turns and 10 tool calls, and the last turn must submit notes. An unusual
    amount is not treated as proof of fraud.
 5. **Review queue — application code.** Validates findings, amounts, evidence and
-   citations, saves them, and shows them with their source pages.
+   citations, saves them, and shows the page number and exact source text. Version 1
+   shows no page image because the database deliberately stores no PDFs.
 6. **Human decision — the reviewer.** The reviewer approves or rejects each finding
    through the API. A finding's status is its latest decision, or pending if none exists.
    The database prevents decisions from being edited or deleted. Nothing runs after
@@ -175,7 +177,7 @@ recorded model responses; live-model evaluations run before releases within a se
 
 ## Later
 
-Not part of Version 1: auditor and admin roles, a nightly schedule with email summaries,
+Not part of Version 1: a PDF page viewer, auditor and admin roles, a nightly schedule with email summaries,
 spending forecasts, MCP tool servers, a reviewer agent, expense receipts and
 multi-currency support, and document IDs so same-number resubmissions can be reported
 as duplicates.
