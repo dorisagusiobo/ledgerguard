@@ -12,65 +12,10 @@ import pytest
 import ledgerguard.pipeline as pipeline
 from ledgerguard.evaluate import score
 from ledgerguard.gateway import Budget, MODEL_ID, NOVA_MODEL_ID
-from ledgerguard.pdf import load_pdf_inputs
-from ledgerguard.rules import load_inputs, load_reference, run_rules
+from ledgerguard.rules import load_reference
 
 
-def response(name, payload, *, outputs=100):
-    return {'stopReason': 'tool_use', 'usage': {'inputTokens': 100, 'outputTokens': outputs},
-            'output': {'message': {'role': 'assistant', 'content': [{'toolUse': {
-                'toolUseId': 'fake-use', 'name': name, 'input': payload}}]}}}
-
-
-class FakeClient:
-    def __init__(self, pdfs, invoices, answers, *, fail=None, repeat=None, expensive=None, tool=False):
-        self.records = {pdfs[i.invoice_number]: i.model_dump(mode='json') for i in invoices}
-        semantic = {n for a in answers if a['clause_id'] == 'POL-4' for n in a['invoice_numbers']}
-        self.flagged = {i.line_items[0].description for i in invoices if i.invoice_number in semantic}
-        self.calls = []
-        self.fail, self.repeat, self.expensive, self.tool = fail, repeat, expensive, tool
-
-    def converse(self, **request):
-        content = request['messages'][0]['content']
-        if 'document' in content[0]:
-            record = deepcopy(self.records[content[0]['document']['source']['bytes']])
-            number = record['invoice_number']
-            self.calls.append(('extraction', number, request['modelId']))
-            if number == self.fail:
-                return {'stopReason': 'end_turn', 'usage': {'inputTokens': 100, 'outputTokens': 10}}
-            if self.repeat and number == self.repeat[0]:
-                record['invoice_number'] = self.repeat[1]
-            return response('record_invoice', record)
-        payload = json.loads(content[0]['text'])
-        names = {t['toolSpec']['name'] for t in request['toolConfig']['tools']}
-        if 'record_policy_findings' in names:
-            self.calls.append(('policy', None, request['modelId']))
-            return response('record_policy_findings', {'violations': [
-                {'clause_id': 'POL-4', 'line_index': i['index'], 'confidence': 1.0}
-                for i in payload['line_items'] if i['description'] in self.flagged]})
-        assert 'submit_notes' in names
-        number = payload['invoice']['invoice_number']
-        self.calls.append(('investigation', number, request['modelId']))
-        if (self.tool or number == self.expensive) and len(request['messages']) == 1:
-            return response('related_invoices', {
-                'vendor_name': payload['invoice']['vendor_name'],
-                'start': payload['invoice']['invoice_date'], 'end': payload['invoice']['invoice_date']},
-                outputs=32000 if number == self.expensive else 100)
-        return response('submit_notes', {'notes': [
-            {'finding_index': f['index'], 'summary': f"Evidence: {f['calculation']}. Clearly supported.",
-             'related_invoices': f['invoice_numbers'], 'uncertainty': 'low'} for f in payload['findings']]})
-
-
-@pytest.fixture
-def case(generated):
-    root = generated(7)
-    inputs = load_inputs(root)
-    splits = json.loads((root / 'splits.json').read_text())
-    answers = json.loads((root / 'answer_key/expected_findings.json').read_text())
-    invoices = [i for i in inputs.invoices if splits[i.invoice_number] == 'dev']
-    all_pdfs = load_pdf_inputs(root)
-    pdfs = {n: b for n, b in all_pdfs.items() if splits[n] == 'dev'}
-    return root, pdfs, invoices, answers, splits
+from fakes import FakeClient
 
 
 def run(case, tmp_path, *, batch=None, **fake_options):
@@ -277,3 +222,11 @@ def test_invoice_block_in_earlier_stages_skips_later_work(case, tmp_path, monkey
         assert any(target in f.invoice_numbers for f in result.findings)
     else:
         assert target not in result.invoices
+
+
+def test_undersized_batch_refused_before_calls(case, tmp_path):
+    batch = Budget(label='batch', max_calls=len(case[1]) - 1, max_cost='5')
+    with pytest.raises(ValueError, match='cover extraction'):
+        run(case, tmp_path, batch=batch)
+    assert batch.calls == 0 and batch.cost == 0
+    assert not (tmp_path / 'audit.jsonl').exists()

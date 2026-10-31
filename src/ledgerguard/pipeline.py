@@ -45,6 +45,8 @@ def run_pipeline(pdfs: dict[str, bytes], reference: ReferenceInputs, *, client,
     work for that document while preserving already produced evidence/findings.
     Audit I/O failures propagate rather than silently continuing without logs.
     """
+    if batch.max_calls < len(pdfs):
+        raise ValueError('Batch max_calls must cover extraction of every document')
     if batch.label is None:
         batch.label = 'batch'
     if batch.label != 'batch':
