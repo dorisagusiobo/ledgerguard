@@ -3,6 +3,7 @@ from collections import defaultdict
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
+from uuid import uuid4
 
 from ledgerguard.extractor import extract
 from ledgerguard.gateway import Budget, Gateway, GatewayBlocked, MODEL_ID, NOVA_MODEL_ID
@@ -34,10 +35,13 @@ class PipelineResult:
     stopped: str | None = None
     # On a stop, includes the unfinished current stage and all later stages.
     skipped_stages: list[str] = field(default_factory=list)
+    pipeline_run_id: str = field(default_factory=lambda: uuid4().hex)
 
 
 def run_pipeline(pdfs: dict[str, bytes], reference: ReferenceInputs, *, client,
-                 audit_path: Path, models: PipelineModels, batch: Budget) -> PipelineResult:
+                 audit_path: Path | None = None, models: PipelineModels, batch: Budget,
+                 audit=None, monthly=None, checkpointer=None,
+                 pipeline_run_id: str | None = None) -> PipelineResult:
     """Run extraction, batch rules, policy, then grouped investigation.
 
     Input order determines which repeated invoice number is retained. A batch
@@ -51,10 +55,11 @@ def run_pipeline(pdfs: dict[str, bytes], reference: ReferenceInputs, *, client,
         batch.label = 'batch'
     if batch.label != 'batch':
         raise ValueError('Shared pipeline budget must have label batch')
-    result = PipelineResult()
+    pipeline_run_id = uuid4().hex if pipeline_run_id is None else pipeline_run_id
+    result = PipelineResult(pipeline_run_id=pipeline_run_id)
     budgets = {document_id: Budget(label='invoice') for document_id in pdfs}
     gateways = {document_id: Gateway(client=client, budget=budget,
-                                    run_id=f'run-{document_id}', audit_path=audit_path,
+                                    run_id=f'{pipeline_run_id}:{document_id}', audit_path=audit_path, audit=audit, monthly=monthly,
                                     shared_budgets=(batch,))
                 for document_id, budget in budgets.items()}
     by_number, exhausted = {}, set()
@@ -65,7 +70,7 @@ def run_pipeline(pdfs: dict[str, bytes], reference: ReferenceInputs, *, client,
         return result
 
     def blocked(error, document_id, stage):
-        if error.scope == 'batch':
+        if error.scope in {'batch', 'monthly'}:
             result.stopped = str(error)
             result.skipped_stages = list(STAGES[STAGES.index(stage):])
             return True
@@ -124,7 +129,9 @@ def run_pipeline(pdfs: dict[str, bytes], reference: ReferenceInputs, *, client,
             continue
         try:
             investigation = investigate(result.invoices[document_id], deepcopy(findings), tools=tools,
-                                        gateway=gateways[document_id], model_id=models.investigate)
+                                        gateway=gateways[document_id], model_id=models.investigate,
+                                        checkpointer=checkpointer,
+                                        thread_id=f'{gateways[document_id].run_id}:{number}')
         except GatewayBlocked as error:
             if blocked(error, document_id, 'investigation'):
                 return finish()

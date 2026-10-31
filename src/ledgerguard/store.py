@@ -65,6 +65,8 @@ def save_run(conn, result: PipelineResult, metadata: RunMetadata | Mapping):
         raise ValueError('Saving a run requires an idle connection')
     if isinstance(metadata, Mapping):
         metadata = RunMetadata(**metadata)
+    if metadata.run_id != result.pipeline_run_id:
+        raise ValueError('metadata.run_id must match result.pipeline_run_id')
     needed = set(result.invoices) | set(result.budgets) | {
         r['document_id'] for r in result.referrals if 'document_id' in r}
     if not needed <= metadata.document_hashes.keys():

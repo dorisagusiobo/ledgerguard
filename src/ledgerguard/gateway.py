@@ -12,8 +12,8 @@ Input key NB7aHsk8SCFhgsXJJRvBTxu4xhoyw2_4c97GBxqcHrQ = 0.0003;
 output key pChkwb9lpAj18OhnQBD7c2I4YO2hSqm451bQtxrTfvI = 0.0025.
 The page multiplies these per-1K rates by 1000: 0.30 / 2.50 USD/1M.
 
-Budgets are in-memory, shared explicitly by callers, not a persistent monthly
-ledger. Reuse the same run budget across extraction, policy and investigation.
+Invoice/batch budgets are shared in memory; an optional MonthlyLedger persists
+monthly reservations. Reuse the run budget across every pipeline stage.
 Disable SDK automatic retries so each network attempt passes this boundary.
 """
 from contextlib import ExitStack
@@ -21,7 +21,6 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from decimal import Decimal
-import json
 from pathlib import Path
 from threading import RLock
 from typing import Callable
@@ -29,6 +28,7 @@ from uuid import uuid4
 
 from pydantic import ValidationError
 
+from ledgerguard.audit import AuditSink, JsonlSink
 from ledgerguard.tools import MAX_ROWS, TOOL_ARGUMENTS
 
 MILLION = Decimal('1000000')
@@ -123,7 +123,8 @@ def contains_cache_point(value):
 
 
 class Gateway:
-    def __init__(self, *, client, budget: Budget, run_id: str, audit_path: Path,
+    def __init__(self, *, client, budget: Budget, run_id: str, audit_path: Path | None = None,
+                 audit: AuditSink | None = None, monthly=None,
                  prices: dict[str, Prices] | None = None,
                  input_estimator: Callable[[dict], int] = estimate_input,
                  shared_budgets: tuple[Budget, ...] = ()):
@@ -131,11 +132,11 @@ class Gateway:
         self.prices = dict(DEFAULT_PRICES if prices is None else prices)
         self.input_estimator = input_estimator
         self.budgets = list({id(b): b for b in (budget, *shared_budgets)}.values())
-        self.audit_path = Path(audit_path).resolve()
-        project_data = Path(__file__).resolve().parents[2] / 'data'
-        if self.audit_path.is_relative_to(project_data) or 'data' in self.audit_path.parts:
-            raise ValueError('Audit log must be outside data directories')
-        self.audit_path.parent.mkdir(parents=True, exist_ok=True)
+        if (audit is None) == (audit_path is None):
+            raise ValueError('Provide exactly one of audit or audit_path')
+        self.audit = audit if audit is not None else JsonlSink(audit_path)
+        self.audit_path = self.audit.path if isinstance(self.audit, JsonlSink) else None
+        self.monthly = monthly
         # SDK retries would bypass per-attempt accounting. Never alter the client.
         config = getattr(getattr(client, 'meta', None), 'config', None)
         retries = getattr(config, 'retries', None) or {}
@@ -149,17 +150,25 @@ class Gateway:
             for budget in sorted(self.budgets, key=id):
                 stack.enter_context(budget._lock)
             # Open before invocation: an unwritable audit destination prevents calls.
-            log = stack.enter_context(self.audit_path.open('a', encoding='utf-8'))
+            writer = stack.enter_context(self.audit.session())
             record = {'time': datetime.now(timezone.utc).isoformat(), 'model': model_id,
                       'run_id': self.run_id, 'decision': 'block', 'outcome': 'blocked',
                       'reason': None, 'input_tokens': 0, 'output_tokens': 0,
                       'cost': '0', 'reserved_cost': '0'}
 
             def audit():
-                log.write(json.dumps(record, sort_keys=True) + '\n')
-                log.flush()
+                writer.append(record)
+
+            reservation = None
+
+            def release():
+                nonlocal reservation
+                if reservation is not None:
+                    self.monthly.reconcile(reservation, Decimal(0))
+                    reservation = None
 
             def block(reason, scope=None):
+                release()
                 record['reason'] = reason
                 record['scope'] = scope
                 audit()
@@ -180,20 +189,31 @@ class Gateway:
                 reserved = self.prices[model_id].cost(estimate, max_tokens)
             except (KeyError, TypeError, ValueError):
                 block('invalid_or_unsupported_request')
+            if self.monthly is not None:
+                try:
+                    reservation = self.monthly.reserve(reserved)
+                except GatewayBlocked as error:
+                    block(str(error), error.scope)
             for budget in self.budgets:
                 if budget.calls + 1 > budget.max_calls:
                     block('max_calls_exceeded', budget.label)
                 if budget.cost + reserved > budget.max_cost:
                     block('max_cost_exceeded', budget.label)
+            record.update(decision='allow', reserved_cost=str(reserved))
+            try:
+                writer.authorize(record)
+            except BaseException:
+                release()
+                raise
             for budget in self.budgets:
                 budget.calls += 1
                 budget.cost += reserved
-            record.update(decision='allow', reserved_cost=str(reserved))
             try:
                 response = self.client.converse(modelId=model_id, **request)
             except Exception:
                 for budget in self.budgets:
                     budget.cost -= reserved
+                release()
                 record.update(outcome='client_error', reason='client_error')
                 audit()
                 # Do not propagate provider exception text, which can echo input.
@@ -206,10 +226,14 @@ class Gateway:
                     raise ValueError()
                 actual = self.prices[model_id].cost(inputs, outputs)
             except (KeyError, TypeError, ValueError):
+                if reservation is not None:
+                    self.monthly.reconcile(reservation, reserved)
                 # Unknown usage must not silently release potentially spent funds.
                 record.update(outcome='invalid_usage', reason='reservation_retained', cost=str(reserved))
                 audit()
                 raise RuntimeError('Bedrock usage invalid; reservation retained') from None
+            if reservation is not None:
+                self.monthly.reconcile(reservation, actual)
             for budget in self.budgets:
                 budget.cost += actual - reserved
             record.update(outcome='success', input_tokens=inputs, output_tokens=outputs, cost=str(actual))
@@ -229,7 +253,7 @@ class Gateway:
         with ExitStack() as stack:
             for budget in sorted(self.budgets, key=id):
                 stack.enter_context(budget._lock)
-            log = stack.enter_context(self.audit_path.open('a', encoding='utf-8'))
+            writer = stack.enter_context(self.audit.session())
             for budget in self.budgets:
                 budget.tool_calls += 1
             record = {'time': datetime.now(timezone.utc).isoformat(), 'run_id': self.run_id,
@@ -237,8 +261,7 @@ class Gateway:
                       'decision': 'block', 'reason': None, 'outcome': 'blocked', 'row_count': 0}
 
             def audit():
-                log.write(json.dumps(record, sort_keys=True) + '\n')
-                log.flush()
+                writer.append(record)
 
             def block(reason, scope=None):
                 record['reason'] = reason

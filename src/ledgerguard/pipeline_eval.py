@@ -121,6 +121,7 @@ def compare(data: Path, *, client, max_cost: Decimal, audit_path: Path,
     metadata_path = data / 'metadata.json'
     metadata = json.loads(metadata_path.read_text()) if metadata_path.exists() else {}
     return {
+        'pipeline_run_id': result.pipeline_run_id,
         'metadata': {'seed': metadata.get('seed'), 'date': datetime.now(timezone.utc).isoformat(),
                      'git_revision': revision(), 'model_ids': {'extract': models.extract,
                      'policy': models.policy, 'investigate': models.investigate}, 'max_cost': str(max_cost)},

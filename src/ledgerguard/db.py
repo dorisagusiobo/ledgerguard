@@ -47,6 +47,35 @@ def migrate(conn, path: Path = MIGRATIONS) -> list[str]:
     return applied_now
 
 
+CHECKPOINT_TABLES = ('checkpoints', 'checkpoint_blobs', 'checkpoint_writes')
+
+
+def setup_checkpoints(conn):
+    """Owner-only, autocommitted LangGraph setup; runtime never calls setup."""
+    from langgraph.checkpoint.postgres import PostgresSaver
+    from psycopg.rows import dict_row, tuple_row
+
+    if not conn.autocommit or conn.info.transaction_status != TransactionStatus.IDLE:
+        raise ValueError('Checkpoint setup requires an idle autocommit connection')
+    with conn.cursor(row_factory=tuple_row) as cursor:
+        row = cursor.execute("SELECT current_user, tableowner FROM pg_tables WHERE schemaname='public' AND tablename='runs'").fetchone()
+        if row is None or row[0] != row[1] or row[0] == 'ledgerguard_app':
+            raise PermissionError('Checkpoint setup requires the migration owner')
+    original_factory = conn.row_factory
+    conn.execute('SELECT pg_advisory_lock(17492104)')
+    try:
+        conn.row_factory = dict_row
+        PostgresSaver(conn).setup()
+        conn.execute('REVOKE ALL ON checkpoint_migrations FROM PUBLIC, ledgerguard_app')
+        for table in CHECKPOINT_TABLES:
+            # Fixed identifiers, never user input.
+            conn.execute(f'REVOKE ALL ON {table} FROM PUBLIC, ledgerguard_app')
+            conn.execute(f'GRANT SELECT, INSERT, UPDATE ON {table} TO ledgerguard_app')
+    finally:
+        conn.row_factory = original_factory
+        conn.execute('SELECT pg_advisory_unlock(17492104)')
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('command', choices=['migrate'])
@@ -57,6 +86,7 @@ def main(argv=None):
     try:
         with psycopg.connect(url, autocommit=True) as conn:
             applied = migrate(conn)
+            setup_checkpoints(conn)
     except psycopg.Error:
         # Connection exceptions can include credential-bearing connection strings.
         parser.exit(1, 'Database migration failed; check owner connection and server configuration.\n')

@@ -59,13 +59,13 @@ def test_perfect_pdf_pipeline_and_shared_invoice_accounting(case, tmp_path, monk
     assert len(result.invoices) == 38
     records = [json.loads(line) for line in (tmp_path / 'audit.jsonl').read_text().splitlines()]
     for document_id, invoice in result.invoices.items():
-        logs = [r for r in records if r['run_id'] == f'run-{document_id}' and 'model' in r]
+        logs = [r for r in records if r['run_id'] == f'{result.pipeline_run_id}:{document_id}' and 'model' in r]
         expected = 4 if invoice.invoice_number in groups else 2
         assert len(logs) == result.budgets[document_id]['calls'] == expected
         assert [r['model'] for r in logs[:2]] == [NOVA_MODEL_ID, NOVA_MODEL_ID]
         assert all(r['model'] == MODEL_ID for r in logs[2:])
         assert result.budgets[document_id]['cost'] == sum((Decimal(r['cost']) for r in logs), Decimal(0))
-    assert {r['run_id'] for r in records} == {f'run-{n}' for n in case[1]}
+    assert {r['run_id'] for r in records} == {f'{result.pipeline_run_id}:{n}' for n in case[1]}
     assert all(r['row_count'] >= 1 for r in records if r.get('phase') == 'completion')
 
 
@@ -182,7 +182,7 @@ def test_document_ids_are_independent_of_invoice_numbers(case, tmp_path):
     assert set(result.invoices) == set(result.budgets) == set(renamed)
     assert set(result.notes) == {f.invoice_numbers[0] for f in result.findings}
     logs = [json.loads(line) for line in (tmp_path / 'audit.jsonl').read_text().splitlines()]
-    assert {r['run_id'] for r in logs} == {f'run-{n}' for n in renamed}
+    assert {r['run_id'] for r in logs} == {f'{result.pipeline_run_id}:{n}' for n in renamed}
     assert len(result.findings) == 14
 
 
@@ -208,7 +208,7 @@ def test_invoice_block_in_earlier_stages_skips_later_work(case, tmp_path, monkey
     def converse(gateway, model, request):
         name = request['toolConfig']['tools'][0]['toolSpec']['name']
         current = 'extraction' if name == 'record_invoice' else 'policy'
-        if gateway.run_id == f'run-{target}' and current == stage:
+        if gateway.run_id.endswith(f':{target}') and current == stage:
             gateway.budget.max_cost = gateway.budget.cost
         return original(gateway, model, request)
 
@@ -230,3 +230,14 @@ def test_undersized_batch_refused_before_calls(case, tmp_path):
         run(case, tmp_path, batch=batch)
     assert batch.calls == 0 and batch.cost == 0
     assert not (tmp_path / 'audit.jsonl').exists()
+
+
+def test_explicit_pipeline_run_id_is_returned_and_used(case, tmp_path):
+    root, pdfs, invoices, answers, _ = case
+    result = pipeline.run_pipeline(pdfs, load_reference(root), client=FakeClient(pdfs, invoices, answers),
+                                   audit_path=tmp_path / 'audit.jsonl', models=pipeline.PipelineModels(),
+                                   batch=Budget(label='batch', max_calls=760, max_tool_calls=380, max_cost='5'),
+                                   pipeline_run_id='synthetic-explicit-run')
+    assert result.pipeline_run_id == 'synthetic-explicit-run'
+    logs = [json.loads(line) for line in (tmp_path / 'audit.jsonl').read_text().splitlines()]
+    assert {r['run_id'] for r in logs} == {f'{result.pipeline_run_id}:{number}' for number in pdfs}

@@ -59,9 +59,9 @@ class Investigation:
 class State(TypedDict):
     messages: list[dict]
     turns: int
-    seen: set[str]
+    seen: list[str]
     tool_uses: list[dict]
-    outcome: Investigation | None
+    outcome: dict | None
     route: str
 
 
@@ -104,14 +104,15 @@ def initial_message(invoice: Invoice, findings: list[Finding]) -> dict:
 
 
 def investigate(invoice: Invoice, findings: list[Finding], *, tools: ReadOnlyTools,
-                gateway: Gateway, model_id: str, max_turns=6) -> Investigation:
+                gateway: Gateway, model_id: str, max_turns=6,
+                checkpointer=None, thread_id: str | None = None) -> Investigation:
     if type(max_turns) is not int or max_turns < 1:
         raise ValueError('max_turns must be a positive integer')
     if not findings:
         return Investigation(notes=[])
 
     def review(reason):
-        return Investigation(needs_review=ReviewReferral(invoice.invoice_number, reason))
+        return {'notes': None, 'needs_review': {'invoice_number': invoice.invoice_number, 'reason': reason}}
 
     specs = tool_specs()
 
@@ -173,7 +174,7 @@ def investigate(invoice: Invoice, findings: list[Finding], *, tools: ReadOnlyToo
             results.append({'toolResult': {'toolUseId': use['toolUseId'], 'status': 'success',
                                            'content': [{'json': result}]}})
         return {'messages': [*state['messages'], {'role': 'user', 'content': results}],
-                'seen': seen, 'route': 'model'}
+                'seen': sorted(seen), 'route': 'model'}
 
     def finish(state: State):
         try:
@@ -192,7 +193,8 @@ def investigate(invoice: Invoice, findings: list[Finding], *, tools: ReadOnlyToo
             return {'outcome': review('investigation invalid: note count or index')}
         if any(number not in state['seen'] for note in notes for number in note.related_invoices):
             return {'outcome': review('investigation invalid: unknown related invoice')}
-        return {'outcome': Investigation(notes=sorted(notes, key=lambda n: n.finding_index))}
+        return {'outcome': {'notes': [n.model_dump(mode='json') for n in sorted(notes, key=lambda n: n.finding_index)],
+                            'needs_review': None}}
 
     graph = StateGraph(State)
     graph.add_node('model', model)
@@ -202,12 +204,15 @@ def investigate(invoice: Invoice, findings: list[Finding], *, tools: ReadOnlyToo
     graph.add_conditional_edges('model', lambda s: s['route'], {'finish': 'finish', 'tools': 'tools', 'end': END})
     graph.add_conditional_edges('tools', lambda s: s['route'], {'model': 'model', 'end': END})
     graph.add_edge('finish', END)
-    compiled = graph.compile()
+    compiled = graph.compile(checkpointer=checkpointer)
     try:
         result = compiled.invoke({'messages': [initial_message(invoice, findings)], 'turns': 0,
-                                  'seen': {invoice.invoice_number} | {number for f in findings for number in f.invoice_numbers},
+                                  'seen': sorted({invoice.invoice_number} | {number for f in findings for number in f.invoice_numbers}),
                                   'tool_uses': [], 'outcome': None, 'route': 'model'},
-                                 config={'recursion_limit': 2 * max_turns + 2})
+                                 config={'recursion_limit': 2 * max_turns + 2,
+                                         'configurable': {'thread_id': thread_id or f'{gateway.run_id}:{invoice.invoice_number}'}})
     except GraphRecursionError:
-        return review('investigation stopped: graph recursion limit')
-    return result['outcome']
+        return Investigation(needs_review=ReviewReferral(invoice.invoice_number, 'investigation stopped: graph recursion limit'))
+    outcome = result['outcome']
+    return Investigation(notes=[Note.model_validate(n) for n in outcome['notes']] if outcome['notes'] is not None else None,
+                         needs_review=ReviewReferral(**outcome['needs_review']) if outcome['needs_review'] else None)

@@ -7,7 +7,7 @@ from psycopg import sql
 from psycopg.conninfo import make_conninfo
 import pytest
 
-from ledgerguard.db import migrate
+from ledgerguard.db import migrate, setup_checkpoints
 
 
 def database_url():
@@ -33,6 +33,7 @@ def postgres_database():
         test_url = make_conninfo(url, dbname=name)
         with psycopg.connect(test_url, autocommit=True) as conn:
             migrate(conn)
+            setup_checkpoints(conn)
         yield test_url
     finally:
         admin.execute(sql.SQL('DROP DATABASE IF EXISTS {} WITH (FORCE)').format(sql.Identifier(name)))
@@ -53,3 +54,10 @@ def db_app(postgres_database):
         conn.execute('SET ROLE ledgerguard_app')
         assert conn.execute('SELECT current_user').fetchone()[0] == 'ledgerguard_app'
         yield conn
+
+
+@pytest.fixture
+def app_conninfo(postgres_database):
+    # Authenticate with the isolated DB owner, then operate under the actual app
+    # role; never alter the shared application's password for tests.
+    return make_conninfo(postgres_database, options='-c role=ledgerguard_app')
