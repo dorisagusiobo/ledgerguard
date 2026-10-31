@@ -5,3 +5,5 @@ An AI agent that audits invoices and spending against company policy and vendor 
 *Work in progress.*
 
 See [Architecture](docs/ARCHITECTURE.md) for the current implementation and intended workflow.
+
+See [Local Postgres storage](docs/DATABASE.md) for migrations, connection roles and database tests.

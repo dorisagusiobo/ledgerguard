@@ -17,3 +17,5 @@ infra/tfplan
 
 # Local extraction audit logs and evaluation reports
 runs/
+
+!.env.example

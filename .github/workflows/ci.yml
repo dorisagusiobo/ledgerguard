@@ -13,6 +13,20 @@ jobs:
   tests:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17@sha256:7d0a41464797aeb9862dfdc0bbf1526b82cfd324cdd8036df19e3545f4a9ccb8
+        env:
+          POSTGRES_USER: ledgerguard_owner
+          POSTGRES_DB: ledgerguard
+          POSTGRES_PASSWORD: ci-only-${{ github.run_id }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ledgerguard_owner -d ledgerguard"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -26,5 +40,8 @@ jobs:
       - name: Install locked dependencies
         run: uv sync --locked
 
-      - name: Run offline tests
+      - name: Run offline model tests and local Postgres tests
+        env:
+          CI: "true"
+          DATABASE_URL: postgresql://ledgerguard_owner:ci-only-${{ github.run_id }}@127.0.0.1:5432/ledgerguard
         run: uv run pytest -q
