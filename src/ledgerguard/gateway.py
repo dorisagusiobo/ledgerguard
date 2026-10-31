@@ -39,6 +39,10 @@ NOVA_MODEL_ID = 'global.amazon.nova-2-lite-v1:0'
 class GatewayBlocked(RuntimeError):
     """Rejected before invocation; error messages never contain request content."""
 
+    def __init__(self, reason: str, *, scope: str | None = None):
+        super().__init__(reason)
+        self.scope = scope
+
 
 def decimal_value(value):
     if isinstance(value, (float, bool)):
@@ -80,6 +84,7 @@ class Budget:
     max_calls: int = 20
     max_cost: Decimal = Decimal('0.50')
     max_tool_calls: int = 10
+    label: str | None = None
     calls: int = field(default=0, init=False)
     tool_calls: int = field(default=0, init=False)
     cost: Decimal = field(default=Decimal(0), init=False)
@@ -154,10 +159,11 @@ class Gateway:
                 log.write(json.dumps(record, sort_keys=True) + '\n')
                 log.flush()
 
-            def block(reason):
+            def block(reason, scope=None):
                 record['reason'] = reason
+                record['scope'] = scope
                 audit()
-                raise GatewayBlocked(reason)
+                raise GatewayBlocked(reason, scope=scope)
 
             if model_id not in self.prices:
                 block('model_not_allowed')
@@ -176,9 +182,9 @@ class Gateway:
                 block('invalid_or_unsupported_request')
             for budget in self.budgets:
                 if budget.calls + 1 > budget.max_calls:
-                    block('max_calls_exceeded')
+                    block('max_calls_exceeded', budget.label)
                 if budget.cost + reserved > budget.max_cost:
-                    block('max_cost_exceeded')
+                    block('max_cost_exceeded', budget.label)
             for budget in self.budgets:
                 budget.calls += 1
                 budget.cost += reserved
@@ -234,10 +240,11 @@ class Gateway:
                 log.write(json.dumps(record, sort_keys=True) + '\n')
                 log.flush()
 
-            def block(reason):
+            def block(reason, scope=None):
                 record['reason'] = reason
+                record['scope'] = scope
                 audit()
-                raise GatewayBlocked(reason)
+                raise GatewayBlocked(reason, scope=scope)
 
             if not isinstance(name, str) or name not in TOOL_ARGUMENTS:
                 block('tool_not_allowed')
@@ -245,8 +252,9 @@ class Gateway:
                 args = TOOL_ARGUMENTS[name].model_validate(arguments)
             except (ValidationError, TypeError, ValueError):
                 block('invalid_tool_arguments')
-            if any(b.tool_calls > b.max_tool_calls for b in self.budgets):
-                block('max_tool_calls_exceeded')
+            for budget in self.budgets:
+                if budget.tool_calls > budget.max_tool_calls:
+                    block('max_tool_calls_exceeded', budget.label)
             record.update(decision='allow', outcome='authorized', row_count=None)
             audit()  # Failure here stops execution; nothing has run yet.
             try:

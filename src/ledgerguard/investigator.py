@@ -163,7 +163,7 @@ def investigate(invoice: Invoice, findings: list[Finding], *, tools: ReadOnlyToo
                     results.append({'toolResult': {'toolUseId': use['toolUseId'], 'status': 'error',
                                                    'content': [{'text': 'Tool call was rejected.'}]}})
                     continue
-                if str(error) == 'max_tool_calls_exceeded':
+                if str(error) == 'max_tool_calls_exceeded' and error.scope is None:
                     return {'route': 'end', 'outcome': review('investigation stopped: tool limit')}
                 raise
             except RuntimeError:

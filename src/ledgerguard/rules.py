@@ -22,6 +22,13 @@ class RuleConfig(Schema):
 
 
 @dataclass
+class ReferenceInputs:
+    contracts: list[dict]
+    history: list[dict]
+    policy_clauses: dict[str, Citation]
+
+
+@dataclass
 class RuleInputs:
     invoices: list[Invoice]
     contracts: list[dict]
@@ -41,8 +48,8 @@ class RuleResult:
     needs_review: list[ReviewReferral]
 
 
-def load_inputs(path: Path) -> RuleInputs:
-    """Read only the four input locations; never traverse evaluation answers."""
+def load_reference(path: Path) -> ReferenceInputs:
+    """Read contracts, history and policy only; no invoices or evaluation answers."""
     path = Path(path)
     policy = (path / 'policy.md').read_text()
     title = next(line.removeprefix('# ').strip() for line in policy.splitlines() if line.startswith('# '))
@@ -53,13 +60,20 @@ def load_inputs(path: Path) -> RuleInputs:
             key = match.group(1)
             clauses[key] = Citation(document='policy.md', version=title,
                                     clause_id=key, quote=line)
-    return RuleInputs(
-        invoices=[Invoice.model_validate_json(p.read_text())
-                  for p in sorted((path / 'invoices').glob('*.json'))],
+    return ReferenceInputs(
         contracts=json.loads((path / 'contracts.json').read_text()),
         history=json.loads((path / 'history.json').read_text()),
         policy_clauses=clauses,
     )
+
+
+def load_inputs(path: Path) -> RuleInputs:
+    """Load reference data and JSON invoices for existing offline rule consumers."""
+    reference = load_reference(path)
+    return RuleInputs(contracts=reference.contracts, history=reference.history,
+                      policy_clauses=reference.policy_clauses,
+                      invoices=[Invoice.model_validate_json(p.read_text())
+                                for p in sorted((Path(path) / 'invoices').glob('*.json'))])
 
 
 def cents(value: Decimal) -> Decimal:

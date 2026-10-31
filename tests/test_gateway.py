@@ -234,3 +234,36 @@ def test_nova_regional_profile_not_implicitly_allowed(tmp_path, request_data):
     with pytest.raises(GatewayBlocked, match='model_not_allowed'):
         gw.converse('us.amazon.nova-2-lite-v1:0', request_data)
     assert not gw.client.calls
+
+
+@pytest.mark.parametrize('scope', ['invoice', 'batch'])
+def test_block_scope_identifies_budget_without_changing_message(tmp_path, request_data, scope):
+    invoice = Budget(label='invoice', max_cost='0' if scope == 'invoice' else '0.50')
+    batch = Budget(label='batch', max_cost='0' if scope == 'batch' else '0.50')
+    gw = gateway(tmp_path, budget=invoice, shared_budgets=(batch,))
+    with pytest.raises(GatewayBlocked) as caught:
+        gw.converse(MODEL_ID, request_data)
+    assert str(caught.value) == 'max_cost_exceeded'
+    assert caught.value.scope == scope
+    assert records(tmp_path)[0]['scope'] == scope
+    assert not gw.client.calls
+
+
+@pytest.mark.parametrize('scope', ['invoice', 'batch'])
+def test_call_cap_has_budget_scope(tmp_path, request_data, scope):
+    invoice = Budget(label='invoice', max_calls=0 if scope == 'invoice' else 20)
+    batch = Budget(label='batch', max_calls=0 if scope == 'batch' else 20)
+    gw = gateway(tmp_path, budget=invoice, shared_budgets=(batch,))
+    with pytest.raises(GatewayBlocked) as caught:
+        gw.converse(MODEL_ID, request_data)
+    assert str(caught.value) == 'max_calls_exceeded' and caught.value.scope == scope
+
+
+@pytest.mark.parametrize('scope', ['invoice', 'batch'])
+def test_tool_cap_has_budget_scope(tmp_path, scope):
+    invoice = Budget(label='invoice', max_tool_calls=0 if scope == 'invoice' else 10)
+    batch = Budget(label='batch', max_tool_calls=0 if scope == 'batch' else 10)
+    gw = gateway(tmp_path, budget=invoice, shared_budgets=(batch,))
+    with pytest.raises(GatewayBlocked) as caught:
+        gw.call_tool('vendor_history', {'vendor_name': 'Synthetic Vendor'}, None)
+    assert str(caught.value) == 'max_tool_calls_exceeded' and caught.value.scope == scope
