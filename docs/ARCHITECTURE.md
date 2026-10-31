@@ -1,9 +1,11 @@
 # LedgerGuard architecture
 
 This document describes the planned Version 1. Built so far: the synthetic data and PDF
-generator, the extractor, the rule checks, the scorer, and the governance gateway for
-model calls (budgets are in memory, not yet a persistent monthly ledger). The policy
-checker, investigator, database, review queue and deployment are not built yet.
+generator, the extractor, the rule checks, the policy checker, the investigator with its
+read-only tools, the scorer and per-step live evaluations, and the governance gateway for
+model and tool calls (budgets are in memory, not yet a persistent monthly ledger). The
+database, review queue and deployment are not built yet, and pgvector clause retrieval
+is deferred (see step 3).
 
 ## 1. Problem
 
@@ -36,13 +38,21 @@ Invoice PDF → Extractor → Rule checks → Policy checker → Investigator �
 2. **Rule checks — code.** Explicit, testable rules check totals, exact and near
    duplicates, contract rate differences, approval thresholds, possible split purchases,
    and amounts far above a vendor's usual spending. Amounts use decimal arithmetic.
-3. **Policy checker — code plus one AI call.** Code retrieves the relevant policy and
-   contract clauses from pgvector, then one model call compares the invoice with those
-   clauses and proposes findings that cite the exact clause and document version.
+3. **Policy checker — code plus one AI call.** Code selects the clauses that need
+   judgment (clauses enforced by the rule checks are excluded so findings are not
+   double-counted), then one model call compares the invoice's line items with those
+   clauses. The model returns only a clause ID, a line number and a confidence; code
+   builds the citation, amount and evidence from stored data, so a citation cannot be
+   invented. Low confidence or invalid output goes to review. The synthetic policy has
+   one judgment clause, so every judgment clause is sent; pgvector retrieval will replace
+   this once the policy is large enough to need search.
 4. **Investigator — the one agent, flagged invoices only.** For invoices with at least one
    finding, the agent uses a small set of read-only tools (vendor history, related
-   invoices, duplicate search) to gather evidence and explain uncertainty. It has a step
-   cap and a cost cap. An unusual amount is not treated as proof of fraud.
+   invoices, duplicate search) to gather evidence and explain uncertainty. It writes one
+   note per finding and never adds, removes or changes findings. Notes may reference only
+   invoice numbers from the findings or from tool results in that run. It has at most
+   6 model turns and 10 tool calls, and the last turn must submit notes. An unusual
+   amount is not treated as proof of fraud.
 5. **Review queue — application code.** Validates findings, amounts, evidence and
    citations, saves them, and shows them with their source pages.
 6. **Human decision — the reviewer.** The LangGraph run pauses (interrupt) with its state
@@ -58,8 +68,8 @@ approval, and writes the result to the audit log before anything runs.
 | --- | --- |
 | Python + FastAPI | Rule checks, financial calculations, and the API for ingestion, findings and decisions |
 | LangGraph | Workflow state, the bounded investigator loop, and the pause for human review |
-| Amazon Bedrock (Converse API) | Model calls through the gateway; the model for each step is chosen by evaluation. Extraction uses Amazon Nova 2 Lite; Claude Sonnet 4.6 is the default for policy comparison and investigation until those steps are evaluated |
-| Postgres + pgvector | Records, audit log, LangGraph checkpoints and clause search (Neon free tier, or local Docker) |
+| Amazon Bedrock (Converse API) | Model calls through the gateway; the model for each step is chosen by evaluation. Extraction and policy checking use Amazon Nova 2 Lite; investigation uses Claude Sonnet 4.6 |
+| Postgres + pgvector | Records, audit log and LangGraph checkpoints, plus clause search once the policy needs it (Neon free tier, or local Docker) |
 | Next.js | Review queue and evidence viewer |
 | AWS Lambda or App Runner | Hosting for the API; choose during deployment based on run length |
 | Terraform | Reproducible infrastructure and the AWS Budgets configuration |
@@ -125,7 +135,23 @@ from what the model sees.
 | Cost and time per invoice | Whether it is practical to run |
 
 Targets: at least 90% precision and 90% recall on held-out invoices, and every governance
-test passing. These are goals, not results. CI runs the tests and a small evaluation with
+test passing. These are goals, not results.
+
+**Development results so far (`dev` split, seed 7; not held-out results).** Each step was
+evaluated on its own:
+
+| Step | Result |
+| --- | --- |
+| Rules only | 12 of 14 planted problems caught, 100% precision, 0 of 20 clean invoices flagged |
+| Extraction (Nova 2 Lite) | 38 of 38 invoices extracted exactly; planted arithmetic errors preserved; $0.0011 per invoice |
+| Rules + policy checker (Nova 2 Lite) | 14 of 14 caught, 100% precision, 0 of 20 clean invoices flagged; $0.0004 per invoice |
+| Investigator (Claude Sonnet 4.6) | 12 of 12 investigations completed, findings unchanged, expected tool used every time; $0.0165 per investigation |
+
+`dev` contains only two semantic policy cases, so the policy result is weak evidence.
+One of them, "Store credit - staff rewards", is arguably not a cash equivalent; Sonnet
+did not flag it. The label was kept as planted rather than changed after seeing results.
+Investigator notes are graded by hand against a checklist; there is no automatic quality
+score. CI runs the tests and a small evaluation with
 recorded model responses; live-model evaluations run before releases within a set budget.
 
 ## 8. Decision log
@@ -136,6 +162,9 @@ recorded model responses; live-model evaluations run before releases within a se
 | Postgres + pgvector | One database for records, audit log, checkpoints and clause search | OpenSearch Serverless; a second service, and costly at this scale |
 | Bedrock Converse API | One request format for every model, so models can be compared on the same evaluation | The Anthropic SDK, which works with Claude models only |
 | Amazon Nova 2 Lite for extraction | On the 38 `dev` invoices it matched Claude Sonnet 4.6 on every extraction and detection measure at about 1/13 the cost ($0.0011 vs $0.0138 per invoice). The synthetic PDFs are clean, one page and one line item, so harder invoices need re-evaluation | Claude Sonnet 4.6, kept available through the gateway |
+| Amazon Nova 2 Lite for policy checking | With the rules it caught 14 of 14 on `dev` with no false flags at $0.0004 per invoice; Sonnet caught 13 of 14 at $0.0034. The deciding case is debatable and `dev` has only two semantic cases | Claude Sonnet 4.6 |
+| Claude Sonnet 4.6 for investigation | Its notes cite the evidence and separate certainty from intent. Nova 2 Lite completed every investigation but wrote unsupported claims, such as explaining away an unusual amount with low uncertainty and claiming the vendor split amounts to avoid detection. Notes are the only model text a reviewer reads, so quality outweighs the 4× cost ($0.0165 vs $0.0044 per investigation) | Amazon Nova 2 Lite |
+| Send all judgment clauses; defer pgvector | Only one synthetic clause needs judgment, so retrieval would add a database without changing results | pgvector retrieval now |
 | Synthetic data only | Planted errors give known answers, and no real company data is exposed | Real invoices, which are out of scope |
 | A person approves every finding | Accountability stays with finance; model mistakes cannot cause financial actions | Fully automatic decisions |
 | Budget caps in application code | Stops spending before a call is made | AWS Budgets alone, which only alerts |
