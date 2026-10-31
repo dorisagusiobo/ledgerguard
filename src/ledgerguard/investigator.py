@@ -27,10 +27,12 @@ class Note(Schema):
     finding_index: int = Field(ge=0, strict=True)
     summary: Text = Field(
         max_length=600,
-        description='At most three sentences and under 600 characters: the evidence, then how certain it is.'
+        description='At most three sentences and under 500 characters: the evidence, then how certain it is.'
     )
     related_invoices: list[Text]
-    uncertainty: Literal['low', 'medium', 'high']
+    uncertainty: Literal['low', 'medium', 'high'] = Field(
+        description='low = the evidence clearly supports the finding; high = the evidence is weak or conflicting.'
+    )
 
 
 class SubmitNotes(Schema):

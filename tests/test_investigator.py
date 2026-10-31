@@ -316,5 +316,9 @@ def test_submit_notes_request_describes_summary_length(context, tmp_path):
     summary = spec['inputSchema']['json']['properties']['notes']['items']['properties']['summary']
     assert summary['maxLength'] == 600
     assert summary['description'] == (
-        'At most three sentences and under 600 characters: the evidence, then how certain it is.'
+        'At most three sentences and under 500 characters: the evidence, then how certain it is.'
+    )
+    uncertainty = spec['inputSchema']['json']['properties']['notes']['items']['properties']['uncertainty']
+    assert uncertainty['description'] == (
+        'low = the evidence clearly supports the finding; high = the evidence is weak or conflicting.'
     )
