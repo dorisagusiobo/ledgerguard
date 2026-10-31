@@ -25,6 +25,11 @@ import json
 from pathlib import Path
 from threading import RLock
 from typing import Callable
+from uuid import uuid4
+
+from pydantic import ValidationError
+
+from ledgerguard.tools import MAX_ROWS, TOOL_ARGUMENTS
 
 MILLION = Decimal('1000000')
 MODEL_ID = 'global.anthropic.claude-sonnet-4-6'
@@ -74,12 +79,15 @@ DEFAULT_PRICES = {
 class Budget:
     max_calls: int = 20
     max_cost: Decimal = Decimal('0.50')
+    max_tool_calls: int = 10
     calls: int = field(default=0, init=False)
+    tool_calls: int = field(default=0, init=False)
     cost: Decimal = field(default=Decimal(0), init=False)
     _lock: RLock = field(default_factory=RLock, init=False, repr=False, compare=False)
 
     def __post_init__(self):
         token_count(self.max_calls)
+        token_count(self.max_tool_calls)
         self.max_cost = decimal_value(self.max_cost)
 
 
@@ -203,3 +211,55 @@ class Gateway:
                 record['reason'] = 'usage_exceeded_estimate'
             audit()
             return response
+
+
+    def call_tool(self, name: str, arguments: dict, tools):
+        """Authorize read-only tools before execution, then append completion.
+
+        Every attempt consumes a slot, even invalid or over-cap attempts. Two
+        records for allowed calls preserve append-only pre-execution authorization
+        and final outcomes; blocked calls need only one record. Values never log.
+        """
+        with ExitStack() as stack:
+            for budget in sorted(self.budgets, key=id):
+                stack.enter_context(budget._lock)
+            log = stack.enter_context(self.audit_path.open('a', encoding='utf-8'))
+            for budget in self.budgets:
+                budget.tool_calls += 1
+            record = {'time': datetime.now(timezone.utc).isoformat(), 'run_id': self.run_id,
+                      'call_id': uuid4().hex, 'tool': name, 'phase': 'authorization',
+                      'decision': 'block', 'reason': None, 'outcome': 'blocked', 'row_count': 0}
+
+            def audit():
+                log.write(json.dumps(record, sort_keys=True) + '\n')
+                log.flush()
+
+            def block(reason):
+                record['reason'] = reason
+                audit()
+                raise GatewayBlocked(reason)
+
+            if not isinstance(name, str) or name not in TOOL_ARGUMENTS:
+                block('tool_not_allowed')
+            try:
+                args = TOOL_ARGUMENTS[name].model_validate(arguments)
+            except (ValidationError, TypeError, ValueError):
+                block('invalid_tool_arguments')
+            if any(b.tool_calls > b.max_tool_calls for b in self.budgets):
+                block('max_tool_calls_exceeded')
+            record.update(decision='allow', outcome='authorized', row_count=None)
+            audit()  # Failure here stops execution; nothing has run yet.
+            try:
+                result = getattr(tools, name)(**args.model_dump())
+                if (not isinstance(result, dict) or not isinstance(result.get('rows'), list)
+                        or len(result['rows']) > MAX_ROWS or type(result.get('truncated')) is not bool):
+                    raise ValueError('Invalid tool result shape')
+            except Exception:
+                record.update(time=datetime.now(timezone.utc).isoformat(), phase='completion',
+                              outcome='tool_error', reason='tool_error', row_count=None)
+                audit()  # Audit I/O failures propagate unchanged and stop the run.
+                raise RuntimeError('Read-only tool failed') from None
+            record.update(time=datetime.now(timezone.utc).isoformat(), phase='completion',
+                          outcome='success', row_count=len(result['rows']))
+            audit()
+            return result
