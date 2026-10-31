@@ -62,8 +62,8 @@ no writable status column, and the app can only SELECT the view. Saving a result
 
 The app role has INSERT/SELECT only on `audit_log` and `decisions`. UPDATE/DELETE
 row triggers and TRUNCATE statement triggers also reject owner mutations. New
-decisions supersede old ones. No decision writer or approval action is part of
-this step. Deliberate schema changes by an owner/superuser can remove protection;
+decisions supersede old ones. The review API appends decisions without financial
+actions. Deliberate schema changes by an owner/superuser can remove protection;
 the app cannot do so.
 
 Database tests create a unique temporary database, migrate it, then drop that
@@ -131,8 +131,8 @@ The caller still receives the public `Investigation` dataclass and `Note` models
 
 LangGraph owns BYTEA blob columns for serialized state. These are the only binary
 columns; no PDFs or raw extraction document blocks enter investigator state.
-Reference data stays in files and pgvector is still unused. The pause for a human
-reviewer and any resumption behavior belong to step 5.
+Reference data stays in files and pgvector is still unused. The review API
+appends decisions without interrupting or resuming the investigator.
 
 
 ### Retention
@@ -140,5 +140,30 @@ reviewer and any resumption behavior belong to step 5.
 Audit records omit prompts and tool results, but checkpoints retain the
 investigator's whole conversation: findings, tool results and notes. The app role
 cannot DELETE checkpoints and there is currently no retention cleanup, so this
-state is kept indefinitely. This supports resumption in step 5 and is appropriate
+state is kept indefinitely. This supports investigator recovery and is appropriate
 for synthetic data. A retention policy is required before introducing real data.
+
+
+## Review API
+
+`ledgerguard.api:app` exposes exactly five routes: GET `/health`, GET `/runs`,
+GET `/runs/{run_id}/findings`, GET `/findings/{finding_id}`, and POST
+`/findings/{finding_id}/decisions`. Interactive docs and OpenAPI routes are disabled.
+The health check is public; every other route requires
+`Authorization: Bearer <REVIEW_API_TOKEN>`. Configure `APP_DATABASE_URL`,
+`REVIEW_API_TOKEN` and `REVIEW_REVIEWER` in the server environment. Only the
+environment supplies reviewer identity; the request can supply only `decision`
+and `note`. Missing configuration fails closed.
+
+The API uses the app role, reads review status from the decision-derived view,
+and commits each new decision before returning 201. It does not resume a graph
+or run any action after approval. Money is returned as strings with two decimal
+places, unit prices with four; times are ISO 8601 UTC. Validation errors contain
+only locations/messages, and database failures return a fixed 503 body without
+connection details. Database-backed API tests run with the rest of the CI suite.
+
+After supplying the environment, start the local API on loopback:
+
+```sh
+uv run --env-file .env uvicorn ledgerguard.api:app --host 127.0.0.1 --port 8000
+```

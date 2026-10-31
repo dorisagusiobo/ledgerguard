@@ -1,11 +1,11 @@
 # LedgerGuard architecture
 
 This document describes the planned Version 1. Built so far: the synthetic data and PDF
-generator, the extractor, the rule checks, the policy checker, the investigator with its
-read-only tools, the scorer and per-step live evaluations, and the governance gateway for
-model and tool calls (budgets are in memory, not yet a persistent monthly ledger). The
-database, review queue and deployment are not built yet, and pgvector clause retrieval
-is deferred (see step 3).
+generator, extractor, rule checks, policy checker, bounded investigator and read-only
+tools, scorer, per-step and pipeline evaluations, and governance gateway. Postgres
+persistence, an independent audit sink, a persistent monthly ledger and investigator
+checkpoints are implemented, along with the five-route review API. The review queue UI
+and deployment are not built yet, and pgvector clause retrieval is deferred (see step 3).
 
 ## 1. Problem
 
@@ -55,8 +55,10 @@ Invoice PDF → Extractor → Rule checks → Policy checker → Investigator �
    amount is not treated as proof of fraud.
 5. **Review queue — application code.** Validates findings, amounts, evidence and
    citations, saves them, and shows them with their source pages.
-6. **Human decision — the reviewer.** The LangGraph run pauses (interrupt) with its state
-   saved in Postgres until the reviewer approves or rejects each finding.
+6. **Human decision — the reviewer.** The reviewer approves or rejects each finding
+   through the API. A finding's status is its latest decision, or pending if none exists.
+   The database prevents decisions from being edited or deleted. Nothing runs after
+   approval in Version 1.
 
 **Governance gateway — code, around every model and tool call.** It checks the tool is on
 the allowed list, validates arguments, checks the budget, returns allow, block or needs
@@ -66,8 +68,8 @@ approval, and writes the result to the audit log before anything runs.
 
 | Component | Purpose |
 | --- | --- |
-| Python + FastAPI | Rule checks, financial calculations, and the API for ingestion, findings and decisions |
-| LangGraph | Workflow state, the bounded investigator loop, and the pause for human review |
+| Python + FastAPI | Rule checks, financial calculations, and the review API for runs, findings and decisions |
+| LangGraph | The bounded investigator loop and its checkpoints |
 | Amazon Bedrock (Converse API) | Model calls through the gateway; the model for each step is chosen by evaluation. Extraction and policy checking use Amazon Nova 2 Lite; investigation uses Claude Sonnet 4.6 |
 | Postgres + pgvector | Records, audit log and LangGraph checkpoints, plus clause search once the policy needs it (Neon free tier, or local Docker) |
 | Next.js | Review queue and evidence viewer |
@@ -158,7 +160,8 @@ recorded model responses; live-model evaluations run before releases within a se
 
 | Decision | Why | Alternative considered |
 | --- | --- | --- |
-| LangGraph | Explicit state, a bounded agent loop, and a built-in pause for human review | Plain Python, which needs custom state and pause handling |
+| LangGraph | Explicit state, a bounded investigator loop and checkpoints | Plain Python, which needs custom state and checkpoint handling |
+| Review status derived from append-only decisions, no LangGraph interrupt | Nothing runs after approval in Version 1, so a paused graph would add complexity without behavior. Add an interrupt only if a step must run after approval. | LangGraph interrupt |
 | Postgres + pgvector | One database for records, audit log, checkpoints and clause search | OpenSearch Serverless; a second service, and costly at this scale |
 | Bedrock Converse API | One request format for every model, so models can be compared on the same evaluation | The Anthropic SDK, which works with Claude models only |
 | Amazon Nova 2 Lite for extraction | On the 38 `dev` invoices it matched Claude Sonnet 4.6 on every extraction and detection measure at about 1/13 the cost ($0.0011 vs $0.0138 per invoice). The synthetic PDFs are clean, one page and one line item, so harder invoices need re-evaluation | Claude Sonnet 4.6, kept available through the gateway |
