@@ -12,6 +12,7 @@ from ledgerguard.gateway import Budget, DEFAULT_PRICES, decimal_value, token_cou
 from ledgerguard.pdf import load_pdf_inputs
 from ledgerguard.pipeline import PipelineModels, run_pipeline
 from ledgerguard.rules import ReviewReferral, load_inputs, load_reference, run_rules
+from ledgerguard.recording import (RecordingClient, RecordingMismatch, ReplayClient, recording_header, request_stage)
 
 STAGES = ('extraction', 'policy', 'investigation')
 
@@ -25,17 +26,7 @@ class StageMeter:
                                'seconds': 0.0, 'cost': Decimal(0), 'unpriced_calls': 0}
                        for stage in STAGES}
 
-    @staticmethod
-    def classify(request):
-        if any('document' in block for message in request.get('messages', [])
-               for block in message.get('content', [])):
-            return 'extraction'
-        names = {tool['toolSpec']['name'] for tool in request['toolConfig']['tools']}
-        if 'record_policy_findings' in names:
-            return 'policy'
-        if 'submit_notes' in names:
-            return 'investigation'
-        raise ValueError('Unrecognized pipeline request type')
+    classify = staticmethod(request_stage)
 
     def converse(self, **request):
         stage = self.stages[self.classify(request)]
@@ -73,6 +64,10 @@ def compare(data: Path, *, client, max_cost: Decimal, audit_path: Path,
         raise ValueError('Use split dev/test and a positive limit')
     if any(model not in MODELS.values() for model in (models.extract, models.policy, models.investigate)):
         raise ValueError('Models must be nova or sonnet profiles')
+    if isinstance(client, (ReplayClient, RecordingClient)) and limit is not None:
+        raise ValueError('Recording and replay require the whole dev split; limit is not allowed')
+    if isinstance(client, (ReplayClient, RecordingClient)) and split != 'dev':
+        raise ValueError('Only dev can be recorded or replayed; keep test held out')
     data, max_cost = Path(data), decimal_value(max_cost)
     pdfs = load_pdf_inputs(data)
     splits = json.loads((data / 'splits.json').read_text())
@@ -91,6 +86,8 @@ def compare(data: Path, *, client, max_cost: Decimal, audit_path: Path,
     result = run_pipeline({n: pdfs[n] for n in selected}, reference, client=meter,
                           audit_path=audit_path, models=models, batch=batch)
     elapsed = perf_counter() - start
+    if isinstance(client, ReplayClient):
+        client.assert_all_used()
 
     # Ground truth and answers must not be loaded until the pipeline returns.
     inputs = load_inputs(data)
@@ -122,6 +119,7 @@ def compare(data: Path, *, client, max_cost: Decimal, audit_path: Path,
     metadata = json.loads(metadata_path.read_text()) if metadata_path.exists() else {}
     return {
         'pipeline_run_id': result.pipeline_run_id,
+        'mode': 'replayed' if isinstance(client, ReplayClient) else 'recorded' if isinstance(client, RecordingClient) else 'live',
         'metadata': {'seed': metadata.get('seed'), 'date': datetime.now(timezone.utc).isoformat(),
                      'git_revision': revision(), 'model_ids': {'extract': models.extract,
                      'policy': models.policy, 'investigate': models.investigate}, 'max_cost': str(max_cost)},
@@ -160,7 +158,7 @@ def compare(data: Path, *, client, max_cost: Decimal, audit_path: Path,
 
 
 def render(report):
-    rows = [f"Split: {report['split']} | Stopped: {report['stopped'] or 'no'}",
+    rows = [f"Mode: {report['mode']} | Split: {report['split']} | Stopped: {report['stopped'] or 'no'}",
             f"Skipped/unfinished stages: {', '.join(report['skipped_stages']) or 'none'}"]
     for label, scored in [('Rules baseline', report['baseline']), ('End to end', report['end_to_end'])]:
         overall, clean = scored['overall'], scored['clean_invoices']
@@ -195,14 +193,21 @@ def main(argv=None):
     parser.add_argument('--split', choices=['dev', 'test'], default='dev')
     parser.add_argument('--max-cost', required=True)
     parser.add_argument('--limit', type=int)
-    parser.add_argument('--live', action='store_true')
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument('--live', action='store_true')
+    mode.add_argument('--replay', type=Path)
+    parser.add_argument('--record', type=Path)
     parser.add_argument('--json', type=Path, dest='json_path')
     parser.add_argument('--audit', type=Path)
     for stage, default in [('extract', 'nova'), ('policy', 'nova'), ('investigate', 'sonnet')]:
         parser.add_argument(f'--{stage}-model', choices=MODELS, default=default)
     args = parser.parse_args(argv)
-    if not args.live:
-        parser.error('--live is required; no AWS client was created')
+    if (args.record or args.replay) and args.limit is not None:
+        parser.error('--limit cannot be used with --record or --replay')
+    if args.record and not args.live:
+        parser.error('--record requires --live; no AWS client was created')
+    if (args.record or args.replay) and args.split != 'dev':
+        parser.error('Only dev can be recorded or replayed; keep test held out')
     try:
         max_cost = decimal_value(args.max_cost)
         if args.limit is not None and args.limit < 1:
@@ -216,13 +221,31 @@ def main(argv=None):
             raise ValueError('JSON report must be outside inputs and separate from audit log')
     except (ValueError, ArithmeticError) as error:
         parser.error(str(error))
-    import boto3
-    from botocore.config import Config
-    client = boto3.client('bedrock-runtime', region_name='us-east-1',
-                          config=Config(retries={'total_max_attempts': 1}))
-    report = compare(args.data, client=client, max_cost=max_cost, audit_path=audit, split=args.split,
-                     limit=args.limit, models=PipelineModels(MODELS[args.extract_model],
-                     MODELS[args.policy_model], MODELS[args.investigate_model]))
+    models = PipelineModels(MODELS[args.extract_model], MODELS[args.policy_model], MODELS[args.investigate_model])
+    model_ids = {'extract': models.extract, 'policy': models.policy, 'investigate': models.investigate}
+    # Output artifacts must never overwrite inputs, each other, or a replay source.
+    destinations = [p.resolve() for p in (audit, args.json_path, args.record) if p is not None]
+    if (len(destinations) != len(set(destinations))
+            or any(p.is_relative_to(args.data.resolve()) for p in destinations)
+            or args.replay and args.replay.resolve() in destinations):
+        parser.error('Recording/report/audit paths must be separate and outside inputs')
+    try:
+        if args.replay:
+            client = ReplayClient(args.replay, data=args.data, model_ids=model_ids)
+        else:
+            header = recording_header(args.data, model_ids, revision()) if args.record else None
+            if args.record and args.record.exists():
+                parser.error('Recording already exists; choose a new path')
+            import boto3
+            from botocore.config import Config
+            client = boto3.client('bedrock-runtime', region_name='us-east-1',
+                                  config=Config(retries={'total_max_attempts': 1}))
+            if args.record:
+                client = RecordingClient(client, args.record, header)
+        report = compare(args.data, client=client, max_cost=max_cost, audit_path=audit, split=args.split,
+                         limit=args.limit, models=models)
+    except RecordingMismatch as error:
+        parser.exit(1, str(error) + '\n')
     if args.json_path:
         args.json_path.parent.mkdir(parents=True, exist_ok=True)
         args.json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + '\n')

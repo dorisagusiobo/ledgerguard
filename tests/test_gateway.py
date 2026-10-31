@@ -267,3 +267,19 @@ def test_tool_cap_has_budget_scope(tmp_path, scope):
     with pytest.raises(GatewayBlocked) as caught:
         gw.call_tool('vendor_history', {'vendor_name': 'Synthetic Vendor'}, None)
     assert str(caught.value) == 'max_tool_calls_exceeded' and caught.value.scope == scope
+
+
+def test_interrupted_call_is_audited_and_reservations_retained(tmp_path, request_data):
+    class InterruptedClient(FakeClient):
+        def converse(self, **request):
+            self.calls.append(request)
+            raise KeyboardInterrupt()
+    shared = Budget(label='batch')
+    gw = gateway(tmp_path, client=InterruptedClient(), shared_budgets=(shared,))
+    with pytest.raises(KeyboardInterrupt):
+        gw.converse(MODEL_ID, request_data)
+    record, = records(tmp_path)
+    assert record['outcome'] == 'aborted' and record['reason'] == 'reservation_retained'
+    assert Decimal(record['cost']) == Decimal(record['reserved_cost']) == gw.budget.cost == shared.cost
+    assert gw.budget.cost == Decimal('0.0018')
+    assert gw.budget.calls == shared.calls == len(gw.client.calls) == 1

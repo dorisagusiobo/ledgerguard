@@ -351,3 +351,19 @@ def test_repeated_pdfs_get_distinct_audit_and_checkpoint_ids(db_owner, app_conni
         ids = {row[0] for row in db_owner.execute('SELECT DISTINCT run_id FROM audit_log WHERE run_id LIKE %s',
                                                   (result.pipeline_run_id + ':%',)).fetchall()}
         assert ids == {f'{result.pipeline_run_id}:{number}' for number in selected}
+
+
+def test_interrupted_call_commits_aborted_audit_and_keeps_monthly_reservation(db_owner, app_conninfo, ledger_case, tmp_path):
+    ledger, _, month = ledger_case
+    class InterruptedClient(Client):
+        def converse(self, **request):
+            self.calls += 1
+            raise KeyboardInterrupt()
+    gw = gateway(tmp_path, client=InterruptedClient(), monthly=ledger, audit=PostgresSink(app_conninfo))
+    with pytest.raises(KeyboardInterrupt):
+        gw.converse(MODEL_ID, request())
+    rows = db_owner.execute('''SELECT outcome, reason, cost FROM audit_log
+        WHERE run_id=%s ORDER BY audit_id''', (gw.run_id,)).fetchall()
+    assert rows == [('authorized', None, Decimal(0)), ('aborted', 'reservation_retained', Decimal('0.02'))]
+    assert balances(db_owner, month) == (Decimal('0.02'), Decimal(0))
+    assert gw.budget.cost == Decimal('0.02') and gw.budget.calls == 1

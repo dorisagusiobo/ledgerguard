@@ -218,6 +218,10 @@ class Gateway:
                 audit()
                 # Do not propagate provider exception text, which can echo input.
                 raise RuntimeError('Bedrock call failed; reservation released') from None
+            except BaseException:
+                record.update(outcome='aborted', reason='reservation_retained', cost=str(reserved))
+                audit()
+                raise
             try:
                 usage = response['usage']
                 inputs = token_count(usage['inputTokens'])
