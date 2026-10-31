@@ -121,6 +121,9 @@ def test_never_stopping_model_hits_turn_cap(generated, tmp_path):
     assert model['referrals']['by_reason'] == {'turn cap': 12}
     assert model['turns'] == {'median': 6, 'max': 6}
     assert len(client.calls) == 72
+    for offset in range(0, 72, 6):
+        assert all(r['toolConfig']['toolChoice'] == {'any': {}} for r in client.calls[offset:offset + 5])
+        assert client.calls[offset + 5]['toolConfig']['toolChoice'] == {'tool': {'name': 'submit_notes'}}
     assert model['findings_unchanged']['rate'] == 1
 
 
@@ -209,3 +212,26 @@ def test_output_safeguards_before_client(generated, tmp_path, monkeypatch, unsaf
     monkeypatch.setattr(boto3, 'client', lambda *a, **kw: pytest.fail('must not create client'))
     with pytest.raises(SystemExit):
         main(['--data', str(data), '--max-cost', '1', '--live', '--json', str(output), '--audit', str(audit)])
+
+
+@pytest.mark.parametrize('reason,expected', [
+    ('investigation invalid: notes schema at loc [["notes", 0, "summary"]]', 'investigation invalid: notes schema'),
+    ('investigation invalid: notes schema at loc [["notes", 1, "uncertainty"]]', 'investigation invalid: notes schema'),
+    ('investigation invalid: note count or index', 'investigation invalid: note count or index'),
+    ('investigation invalid: unknown related invoice', 'investigation invalid: unknown related invoice'),
+])
+def test_specific_note_referrals_group_without_locations(reason, expected):
+    from ledgerguard.investigator_eval import referral_category
+    assert referral_category(reason) == expected
+
+
+def test_referral_report_retains_schema_location_detail(generated, tmp_path):
+    report = run(generated(7), tmp_path,
+                 client=ScriptedClient(summary='x' * 601), models=('nova',), limit=1)
+    referrals = report['models']['nova']['referrals']
+    assert referrals['by_reason'] == {'investigation invalid: notes schema': 1}
+    entry, = referrals['invoices']
+    assert entry['invoice_number'] == report['selected_groups'][0]
+    assert entry['reason'] == 'investigation invalid: notes schema'
+    assert entry['detail'] == 'investigation invalid: notes schema at loc [["notes", 0, "summary"]]'
+    assert 'x' * 601 not in entry['detail']

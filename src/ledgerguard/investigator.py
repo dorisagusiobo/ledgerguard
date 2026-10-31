@@ -19,12 +19,16 @@ Explain the evidence and how certain it is. An unusual amount alone is not evide
 of fraud. Do not call anything fraud. Finish by calling submit_notes with exactly
 one note per finding. Reference only invoice numbers in the supplied invoice or
 findings, or returned by tools in this run.
+Call each tool at most once, then call submit_notes.
 '''
 
 
 class Note(Schema):
     finding_index: int = Field(ge=0, strict=True)
-    summary: Text = Field(max_length=600)
+    summary: Text = Field(
+        max_length=600,
+        description='At most three sentences and under 600 characters: the evidence, then how certain it is.'
+    )
     related_invoices: list[Text]
     uncertainty: Literal['low', 'medium', 'high']
 
@@ -34,6 +38,7 @@ class SubmitNotes(Schema):
 
 
 class ToolUse(Schema):
+    type: str | None = None
     toolUseId: Text
     name: Text
     input: dict
@@ -110,10 +115,11 @@ def investigate(invoice: Invoice, findings: list[Finding], *, tools: ReadOnlyToo
 
     def model(state: State):
         turns = state['turns'] + 1
+        choice = {'tool': {'name': 'submit_notes'}} if state['turns'] == max_turns - 1 else {'any': {}}
         try:
             response = gateway.converse(model_id, {
                 'system': [{'text': SYSTEM_PROMPT}], 'messages': state['messages'],
-                'toolConfig': {'tools': specs, 'toolChoice': {'any': {}}},
+                'toolConfig': {'tools': specs, 'toolChoice': choice},
                 'inferenceConfig': {'maxTokens': 2000, 'temperature': 0},
             })
         except GatewayBlocked:
@@ -136,7 +142,7 @@ def investigate(invoice: Invoice, findings: list[Finding], *, tools: ReadOnlyToo
         except (KeyError, TypeError, AttributeError, ValueError):
             return {'turns': turns, 'route': 'end', 'outcome': review('investigation invalid: model response')}
         # Discard free-form assistant text; only protocol tool calls are replayed.
-        messages = [*state['messages'], {'role': 'assistant', 'content': [{'toolUse': u} for u in uses]}]
+        messages = [*state['messages'], {'role': 'assistant', 'content': [{'toolUse': {key: u[key] for key in ('toolUseId', 'name', 'input')}} for u in uses]}]
         if submit:
             return {'turns': turns, 'messages': messages, 'tool_uses': uses, 'route': 'finish'}
         if turns >= max_turns:
@@ -170,12 +176,20 @@ def investigate(invoice: Invoice, findings: list[Finding], *, tools: ReadOnlyToo
     def finish(state: State):
         try:
             notes = SubmitNotes.model_validate(state['tool_uses'][0]['input']).notes
-            if len(notes) != len(findings) or {n.finding_index for n in notes} != set(range(len(findings))):
-                raise ValueError()
-            if any(number not in state['seen'] for note in notes for number in note.related_invoices):
-                raise ValueError()
-        except (ValidationError, ValueError, TypeError, KeyError):
-            return {'outcome': review('investigation invalid: submitted notes')}
+        except ValidationError as error:
+            fields = set(SubmitNotes.model_fields) | set(Note.model_fields)
+            # Unknown field names are model text too. Preserve known schema paths
+            # and indexes, but redact arbitrary extra-key names as well as values.
+            locations = [[part if type(part) is int or part in fields else '<unknown_field>'
+                          for part in item['loc']]
+                         for item in error.errors(include_input=False, include_context=False, include_url=False)]
+            return {'outcome': review('investigation invalid: notes schema at loc ' + json.dumps(locations))}
+        except (TypeError, KeyError):
+            return {'outcome': review('investigation invalid: notes schema at loc []')}
+        if len(notes) != len(findings) or {n.finding_index for n in notes} != set(range(len(findings))):
+            return {'outcome': review('investigation invalid: note count or index')}
+        if any(number not in state['seen'] for note in notes for number in note.related_invoices):
+            return {'outcome': review('investigation invalid: unknown related invoice')}
         return {'outcome': Investigation(notes=sorted(notes, key=lambda n: n.finding_index))}
 
     graph = StateGraph(State)

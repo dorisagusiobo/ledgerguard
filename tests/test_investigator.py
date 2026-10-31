@@ -159,6 +159,8 @@ def test_turn_cap_exact_call_count(context, tmp_path):
     assert result.needs_review.reason == 'investigation stopped: turn limit'
     assert len(client.calls) == 6
     assert gateway.budget.tool_calls == 5
+    assert all(r['toolConfig']['toolChoice'] == {'any': {}} for r in client.calls[:-1])
+    assert client.calls[-1]['toolConfig']['toolChoice'] == {'tool': {'name': 'submit_notes'}}
 
 
 def test_submit_on_final_turn_is_allowed(context, tmp_path):
@@ -237,3 +239,82 @@ def test_note_and_investigation_validation():
         Investigation()
     with pytest.raises(ValueError):
         Investigation(notes=[], needs_review=object())
+
+
+def test_optional_tool_use_type_accepted_but_never_replayed(context, tmp_path):
+    first = call('duplicate_search', {'invoice_number': context[0].invoice_number})
+    final = submit()
+    for reply in [first, final]:
+        reply['output']['message']['content'][0]['toolUse']['type'] = 'tool_use'
+    client, gateway = setup(tmp_path, [first, final])
+    assert run(context, gateway).notes
+    replayed = client.calls[1]['messages'][1]['content'][0]['toolUse']
+    assert set(replayed) == {'toolUseId', 'name', 'input'}
+
+
+def test_unrecognized_tool_use_extra_is_still_invalid(context, tmp_path):
+    response = submit()
+    response['output']['message']['content'][0]['toolUse']['debug'] = 'PRIVATE-DEBUG'
+    client, gateway = setup(tmp_path, [response])
+    assert_review(run(context, gateway))
+    assert len(client.calls) == 1
+
+
+def test_looping_model_can_finish_when_last_turn_is_forced(context, tmp_path):
+    class LastTurnClient(ScriptedClient):
+        def converse(self, **request):
+            self.calls.append(deepcopy(request))
+            if request['toolConfig']['toolChoice'] == {'tool': {'name': 'submit_notes'}}:
+                return submit()
+            return call('vendor_history', {'vendor_name': context[0].vendor_name})
+
+    client = LastTurnClient([])
+    gateway = Gateway(client=client, budget=Budget(), run_id='FINAL-TURN-001',
+                      audit_path=tmp_path / 'audit.jsonl')
+    result = run(context, gateway, max_turns=6)
+    assert result.needs_review is None and result.notes
+    assert len(client.calls) == 6
+    assert gateway.budget.tool_calls == 5
+    assert 'Call each tool at most once, then call submit_notes.' in client.calls[0]['system'][0]['text']
+
+
+def test_notes_schema_referral_has_locations_not_values(context, tmp_path):
+    secret = 'PRIVATE-SUMMARY-' * 60
+    client, gateway = setup(tmp_path, [submit([note(summary=secret)])])
+    result = run(context, gateway)
+    assert_review(result)
+    assert result.needs_review.reason == 'investigation invalid: notes schema at loc [["notes", 0, "summary"]]'
+    assert secret not in result.needs_review.reason
+
+
+def test_note_count_or_index_has_specific_reason(context, tmp_path):
+    client, gateway = setup(tmp_path, [submit([note(finding_index=10)])])
+    result = run(context, gateway)
+    assert result.needs_review.reason == 'investigation invalid: note count or index'
+
+
+def test_unknown_related_invoice_has_specific_reason(context, tmp_path):
+    client, gateway = setup(tmp_path, [submit([note(related_invoices=['PRIVATE-UNKNOWN-INVOICE'])])])
+    result = run(context, gateway)
+    assert result.needs_review.reason == 'investigation invalid: unknown related invoice'
+
+
+def test_schema_referral_redacts_arbitrary_extra_field_names(context, tmp_path):
+    data = note()
+    data['PRIVATE-MODEL-KEY'] = 'PRIVATE-MODEL-VALUE'
+    client, gateway = setup(tmp_path, [submit([data])])
+    result = run(context, gateway)
+    assert_review(result)
+    assert '<unknown_field>' in result.needs_review.reason
+
+
+def test_submit_notes_request_describes_summary_length(context, tmp_path):
+    client, gateway = setup(tmp_path, [submit()])
+    assert run(context, gateway).notes
+    spec = next(t['toolSpec'] for t in client.calls[0]['toolConfig']['tools']
+                if t['toolSpec']['name'] == 'submit_notes')
+    summary = spec['inputSchema']['json']['properties']['notes']['items']['properties']['summary']
+    assert summary['maxLength'] == 600
+    assert summary['description'] == (
+        'At most three sentences and under 600 characters: the evidence, then how certain it is.'
+    )

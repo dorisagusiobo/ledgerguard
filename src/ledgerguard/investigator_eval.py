@@ -54,6 +54,13 @@ def distribution(values):
 
 
 def referral_category(reason):
+    category = reason.split(' at loc', 1)[0]
+    if category in {
+        'investigation invalid: notes schema',
+        'investigation invalid: note count or index',
+        'investigation invalid: unknown related invoice',
+    }:
+        return category
     return {
         'investigation stopped: turn limit': 'turn cap',
         'investigation stopped: tool limit': 'tool cap',
@@ -150,7 +157,9 @@ def compare(data: Path, *, client, max_cost: Decimal, audit_path: Path,
                 expected[kind] += 1
                 used[kind] += counted.calls[EXPECTED_TOOLS[kind]] > 0
             if result.needs_review:
-                referrals.append({'invoice_number': number, 'reason': referral_category(result.needs_review.reason)})
+                referrals.append({'invoice_number': number,
+                                  'reason': referral_category(result.needs_review.reason),
+                                  'detail': result.needs_review.reason})
                 continue
             completed += 1
             for note in result.notes:
