@@ -289,3 +289,51 @@ def test_decision_does_not_wait_for_migration_locks(client, review_data, db_owne
                                json={'decision': 'approve', 'note': 'Synthetic decision during migration lock'})
         assert response.status_code == 201
         assert response.json()['status'] == 'approved'
+
+
+def with_lambda_event(app, event):
+    async def wrapped(scope, receive, send):
+        if scope['type'] == 'http':
+            scope['aws.event'] = event
+        await app(scope, receive, send)
+    return wrapped
+
+
+def test_aws_identity_comes_only_from_gateway_event(review_data, app_conninfo, monkeypatch):
+    monkeypatch.setenv('LEDGERGUARD_ENV', 'aws')
+    monkeypatch.delenv('REVIEW_REVIEWER', raising=False)
+    monkeypatch.delenv('REVIEW_API_TOKEN', raising=False)
+    monkeypatch.setattr(api, 'runtime_database_url', lambda: app_conninfo)
+    claims = {'email': 'synthetic-reviewer@example.invalid', 'email_verified': 'true', 'token_use': 'id'}
+    event = {'requestContext': {'authorizer': {'jwt': {'claims': claims}}}}
+    with TestClient(with_lambda_event(api.create_app(), event)) as aws:
+        response = aws.post(f'/findings/{review_data[2]}/decisions',
+                            headers={'X-Reviewer': 'forged', 'Authorization': 'Bearer untrusted-header'},
+                            json={'decision': 'approve', 'note': 'Synthetic AWS decision'})
+    assert response.status_code == 201
+    assert response.json()['reviewer'] == claims['email']
+
+
+@pytest.mark.parametrize('claims', [{}, {'email': 'forged@example.invalid'},
+    {'email': 'synthetic@example.invalid', 'email_verified': 'false', 'token_use': 'id'},
+    {'email': 'synthetic@example.invalid', 'email_verified': 'true', 'token_use': 'access'}])
+def test_aws_refuses_missing_or_unverified_event_claims(client, monkeypatch, claims):
+    monkeypatch.setenv('LEDGERGUARD_ENV', 'aws')
+    monkeypatch.delenv('REVIEW_REVIEWER', raising=False)
+    monkeypatch.delenv('REVIEW_API_TOKEN', raising=False)
+    event = {'requestContext': {'authorizer': {'jwt': {'claims': claims}}}}
+    with TestClient(with_lambda_event(api.create_app(), event)) as aws:
+        response = aws.get('/runs', headers={'Authorization': f'Bearer {TOKEN}', 'X-Reviewer': 'forged'})
+        assert response.status_code == 401 and response.json() == {'detail': 'Not authenticated'}
+        assert aws.get('/health').json() == {'status': 'ok'}
+
+
+def test_aws_headers_cannot_forge_authorizer_context(client, monkeypatch):
+    monkeypatch.setenv('LEDGERGUARD_ENV', 'aws')
+    monkeypatch.delenv('REVIEW_REVIEWER', raising=False)
+    monkeypatch.delenv('REVIEW_API_TOKEN', raising=False)
+    with TestClient(api.create_app()) as aws:
+        response = aws.get('/runs', headers={'Authorization': f'Bearer {TOKEN}',
+            'X-Reviewer': 'forged', 'X-Amzn-Oidc-Identity': 'forged',
+            'aws.event': '{"requestContext":{"authorizer":{"jwt":{"claims":{"email":"forged"}}}}}'})
+    assert response.status_code == 401

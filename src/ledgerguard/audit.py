@@ -6,6 +6,8 @@ from typing import ContextManager, Protocol
 
 import psycopg
 
+from ledgerguard.db import pooled_connection
+
 
 class AuditWriter(Protocol):
     def append(self, record: dict) -> None: ...
@@ -43,7 +45,7 @@ class JsonlSink:
 def app_connection(conninfo):
     """Runtime DB sessions must operate as ledgerguard_app, never the owner."""
     try:
-        conn = psycopg.connect(conninfo, autocommit=True, connect_timeout=5)
+        conn = pooled_connection(conninfo)
         try:
             if conn.execute('SELECT current_user').fetchone()[0] != 'ledgerguard_app':
                 raise OSError('Runtime database connection must use ledgerguard_app')

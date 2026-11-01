@@ -19,3 +19,11 @@ infra/tfplan
 runs/
 
 !.env.example
+
+# Deployment output and local Terraform state/config; provider locks stay tracked.
+/dist/
+infra/**/.terraform/
+infra/**/*.tfstate*
+infra/**/*.tfvars
+infra/**/tfplan*
+infra/**/backend.hcl

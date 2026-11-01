@@ -1,0 +1,2 @@
+bucket = "YOUR-STATE-BUCKET"
+region = "us-east-1"

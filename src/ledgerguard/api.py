@@ -4,7 +4,8 @@ from hmac import compare_digest
 import os
 from typing import Annotated, Literal
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
+from mangum import Mangum
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
@@ -12,6 +13,7 @@ import psycopg
 from psycopg.rows import dict_row
 
 from ledgerguard.audit import app_connection
+from ledgerguard.db import runtime_database_url
 from ledgerguard.investigator import Note
 from ledgerguard.models import Citation, FindingStatus, FindingType, SourceRef
 
@@ -121,9 +123,7 @@ def utc(value: datetime) -> str:
 
 
 def database():
-    url = os.environ.get('APP_DATABASE_URL')
-    if not url:
-        raise OSError('Review database is not configured')
+    url = runtime_database_url()
     with app_connection(url) as conn:
         yield conn
 
@@ -143,16 +143,35 @@ def finding_output(row):
 
 
 def create_app() -> FastAPI:
+    mode = os.environ.get('LEDGERGUARD_ENV', 'local')
+    if mode not in {'local', 'aws'}:
+        raise RuntimeError('LEDGERGUARD_ENV must be local or aws')
+    if mode == 'aws' and any(name in os.environ for name in ('REVIEW_REVIEWER', 'REVIEW_API_TOKEN')):
+        raise RuntimeError('Local review settings are forbidden in AWS mode')
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, redirect_slashes=False)
 
     @app.middleware('http')
     async def authenticate(request, call_next):
         # Authenticate before body parsing/validation, including malformed JSON.
         if request.url.path != '/health':
-            expected = os.environ.get('REVIEW_API_TOKEN')
-            parts = request.headers.get('authorization', '').split()
-            valid = (expected and len(parts) == 2 and parts[0].lower() == 'bearer'
-                     and compare_digest(parts[1].encode('utf-8'), expected.encode('utf-8')))
+            if mode == 'aws':
+                # Only API Gateway's verified claims, carried by Mangum's event.
+                # Client headers/body can never create this ASGI scope field.
+                try:
+                    claims = request.scope['aws.event']['requestContext']['authorizer']['jwt']['claims']
+                    reviewer = claims['email']
+                    valid = (isinstance(reviewer, str) and bool(reviewer.strip())
+                             and claims.get('email_verified') in (True, 'true')
+                             and claims.get('token_use') == 'id')
+                except (KeyError, TypeError):
+                    valid = False
+                if valid:
+                    request.state.reviewer = reviewer.strip()
+            else:
+                expected = os.environ.get('REVIEW_API_TOKEN')
+                parts = request.headers.get('authorization', '').split()
+                valid = (expected and len(parts) == 2 and parts[0].lower() == 'bearer'
+                         and compare_digest(parts[1].encode('utf-8'), expected.encode('utf-8')))
             if not valid:
                 return JSONResponse(status_code=401, content={'detail': 'Not authenticated'},
                                     headers={'WWW-Authenticate': 'Bearer'})
@@ -240,10 +259,10 @@ def create_app() -> FastAPI:
                 'decisions': [{**decision, 'time': utc(decision['time'])} for decision in decisions]}
 
     @app.post('/findings/{finding_id}/decisions', status_code=201, response_model=DecisionCreated)
-    def decide(finding_id: int, body: DecisionInput, conn=Depends(database)):
+    def decide(finding_id: int, body: DecisionInput, request: Request, conn=Depends(database)):
         if not -(2 ** 63) <= finding_id < 2 ** 63:
             raise HTTPException(404)
-        reviewer = os.environ.get('REVIEW_REVIEWER', '').strip()
+        reviewer = request.state.reviewer if mode == 'aws' else os.environ.get('REVIEW_REVIEWER', '').strip()
         if not reviewer:
             raise OSError('Reviewer identity is not configured')
         with conn.transaction(), conn.cursor(row_factory=dict_row) as cursor:
@@ -266,3 +285,6 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
+
+
+handler = Mangum(app, lifespan='off')

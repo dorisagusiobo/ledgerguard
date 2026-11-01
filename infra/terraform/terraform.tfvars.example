@@ -1,0 +1,5 @@
+aws_region         = "us-east-1"
+budget_alert_email = "you@example.invalid"
+# Replace these in 8b with the hosted web origin.
+callback_urls = ["http://localhost:3000/auth/callback"]
+logout_urls   = ["http://localhost:3000"]

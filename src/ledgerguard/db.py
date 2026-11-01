@@ -1,6 +1,7 @@
 """Transactional, checksum-verified SQL migrations. No database client at import."""
 import argparse
 from hashlib import sha256
+from functools import lru_cache
 import os
 from pathlib import Path
 import re
@@ -9,6 +10,65 @@ import psycopg
 from psycopg.pq import TransactionStatus
 
 MIGRATIONS = Path(__file__).resolve().parents[2] / 'migrations'
+
+
+def pooled_connection(conninfo):
+    """Transaction-pooler compatible runtime connection; never prepare statements."""
+    try:
+        return psycopg.connect(conninfo, autocommit=True, connect_timeout=5, prepare_threshold=None)
+    except psycopg.Error:
+        raise OSError('Runtime database connection unavailable') from None
+
+
+def direct_connection(conninfo):
+    """Migrations/checkpoint setup need a session-preserving direct endpoint."""
+    from psycopg.conninfo import conninfo_to_dict
+    try:
+        host = conninfo_to_dict(conninfo).get('host', '')
+        if '-pooler' in host:
+            raise OSError('Migrations require the direct endpoint, not a pooler')
+        return psycopg.connect(conninfo, autocommit=True, connect_timeout=5)
+    except psycopg.Error:
+        raise OSError('Direct database connection unavailable') from None
+
+
+def runtime_database_url():
+    """Resolve the app URL privately; AWS stores only a parameter name in env."""
+    if os.environ.get('LEDGERGUARD_ENV', 'local') == 'local':
+        value = os.environ.get('APP_DATABASE_URL')
+        if not value:
+            raise OSError('Review database is not configured')
+        return value
+    name = os.environ.get('APP_DATABASE_PARAMETER')
+    if not name:
+        raise OSError('Review database parameter is not configured')
+    value = parameter_value(name)
+    from psycopg.conninfo import conninfo_to_dict
+    try:
+        tls = conninfo_to_dict(value).get('sslmode')
+    except (psycopg.Error, TypeError, ValueError):
+        raise OSError('Invalid runtime database configuration') from None
+    if tls not in {'require', 'verify-ca', 'verify-full'}:
+        raise OSError('AWS database connections require TLS')
+    return value
+
+
+def parameter_value(name):
+    # Cache for a warm Lambda container. Restart/redeploy after secret rotation.
+    return _parameter_value(name)
+
+
+@lru_cache(maxsize=4)
+def _parameter_value(name):
+    import boto3
+    from botocore.exceptions import BotoCoreError, ClientError
+    try:
+        parameter = boto3.client('ssm').get_parameter(Name=name, WithDecryption=True)['Parameter']
+        if parameter.get('Type') != 'SecureString' or not parameter.get('Value'):
+            raise OSError('Database parameter is not a configured SecureString')
+        return parameter['Value']
+    except (BotoCoreError, ClientError, KeyError, TypeError):
+        raise OSError('Database parameter unavailable') from None
 
 
 def migrate(conn, path: Path = MIGRATIONS) -> list[str]:
@@ -84,10 +144,10 @@ def main(argv=None):
     if not url:
         parser.error('DATABASE_URL is required; use the owner connection')
     try:
-        with psycopg.connect(url, autocommit=True) as conn:
+        with direct_connection(url) as conn:
             applied = migrate(conn)
             setup_checkpoints(conn)
-    except psycopg.Error:
+    except (psycopg.Error, OSError):
         # Connection exceptions can include credential-bearing connection strings.
         parser.exit(1, 'Database migration failed; check owner connection and server configuration.\n')
     print('Applied migrations: ' + (', '.join(applied) or 'none'))
