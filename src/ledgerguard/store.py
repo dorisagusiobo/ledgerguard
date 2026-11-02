@@ -23,6 +23,7 @@ class RunMetadata:
     model_ids: dict[str, str]
     document_hashes: dict[str, str]
     git_revision: str | None = None
+    mode: str = 'local'
     # Optional import of existing JSONL records. Gateway writes remain JSONL in 4a.
     audit_records: list[dict] = field(default_factory=list)
 
@@ -76,10 +77,10 @@ def save_run(conn, result: PipelineResult, metadata: RunMetadata | Mapping):
     status = 'stopped' if result.stopped else 'needs_review' if result.referrals else 'completed'
     with conn.transaction():
         conn.execute('''INSERT INTO runs (run_id, started_at, finished_at, model_ids,
-            git_revision, status, stopped_reason, skipped_stages, budgets)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)''',
+            git_revision, mode, status, stopped_reason, skipped_stages, budgets)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
                      (metadata.run_id, metadata.started_at, metadata.finished_at,
-                      Jsonb(metadata.model_ids), metadata.git_revision, status, result.stopped,
+                      Jsonb(metadata.model_ids), metadata.git_revision, metadata.mode, status, result.stopped,
                       result.skipped_stages, Jsonb(budget_data)))
         for document_id, digest in metadata.document_hashes.items():
             conn.execute('INSERT INTO documents (run_id, document_id, pdf_sha256) VALUES (%s, %s, %s)',

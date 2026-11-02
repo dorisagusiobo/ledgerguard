@@ -73,6 +73,22 @@ Without `DATABASE_URL` local database tests skip; with `CI=true` the missing URL
 fails. CI supplies an isolated service using the same Postgres image.
 
 
+## Save a recorded replay for review
+
+Migration 005 adds run provenance (`mode`, default `local`). Apply pending
+migrations with the direct owner connection before using replay persistence.
+`pipeline_eval --save` is accepted only alongside `--replay`; `--save --live`
+is rejected before creating a provider client. A complete successful replay
+is saved atomically through `pooled_connection(runtime_database_url())`, which
+must operate as `ledgerguard_app`. Its metadata records `mode=replay` and the
+recording header's git commit. PDF hashes, evidence, notes, budgets and the
+replay's gateway audit records are retained. No PDF bytes are stored.
+
+The replay invokes no live model. Reported usage and dollar amounts come from
+the recording; they are not new provider charges. Saving never makes review
+decisions or changes accounting records. A duplicate run ID fails rather than
+replacing existing evidence.
+
 ## Runtime audit and monthly budget
 
 Pass `audit=PostgresSink(APP_DATABASE_URL)` and

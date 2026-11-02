@@ -7,6 +7,17 @@ function files(directory: string): string[] {
     ['node_modules', '.next', '.git', 'coverage'].includes(entry.name) ? [] : entry.isDirectory() ? files(join(directory, entry.name)) : [join(directory, entry.name)]);
 }
 describe('source safety', () => {
+  it('keeps auth tokens on the server and uses configured callback origins', () => {
+    const browserStorage = new RegExp(['local', 'Storage'].join('') + '|' + ['session', 'Storage'].join(''));
+    for (const directory of ['app', 'lib', 'components']) for (const path of files(join(process.cwd(), directory))) {
+      const source = readFileSync(path, 'utf8');
+      expect(browserStorage.test(source), path).toBe(false);
+      expect(source.includes(['NEXT', 'PUBLIC', 'COGNITO'].join('_')), path).toBe(false);
+      if (path.endsWith('/lib/auth.ts') || path.includes('/app/auth/')) {
+        expect(/headers\.get\(['"]host['"]\)/i.test(source), path).toBe(false);
+      }
+    }
+  });
   it('forbids raw HTML, money parsing, public tokens, and client API access', () => {
     const forbidden = [['dangerously', 'SetInnerHTML'].join(''), ['parse', 'Float'].join('')];
     const publicPrefix = ['NEXT', 'PUBLIC', ''].join('_');

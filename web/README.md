@@ -1,6 +1,6 @@
 # LedgerGuard review screen
 
-Local Next.js review of synthetic invoices. Node 24 is required.
+Next.js review of synthetic invoices, with local and Cognito-authenticated AWS modes. Node 24 is required.
 
 ```sh
 npm ci
@@ -18,8 +18,7 @@ its URL. Only server components and server actions call the API.
 
 **Version 1 access limitation:** anyone who can reach the Next.js app can act as
 `REVIEW_REVIEWER`. This is acceptable only because both services run on
-`127.0.0.1`. Do not expose either service to a network. Proper sign-in comes in
-step 8. Approval records a decision and causes no financial or graph action.
+`127.0.0.1`. Do not expose either service to a network. Use the authenticated AWS mode for deployment. Approval records a decision and causes no financial or graph action.
 
 The finding view presents source page numbers and exact text, not PDF images.
 Vendor content and AI notes render as plain text, including markup. Amounts and
@@ -51,3 +50,32 @@ The current npm audit reports 16 moderate development-only advisories in the
 ESLint/minimatch dependency tree. The production dependency audit is clean. The
 lint plugins currently require ESLint 9, so an incompatible forced upgrade is
 not applied; review their upstream updates before deployment.
+
+## AWS sign-in
+
+Set `LEDGERGUARD_ENV=aws` and supply these server-only origins/identifiers:
+`APP_ORIGIN`, `REVIEW_API_URL`, `COGNITO_DOMAIN`, `COGNITO_USER_POOL_ID`, and
+`COGNITO_CLIENT_ID`. Origins must be exact HTTPS origins without paths, user
+information, queries or fragments. Unset `REVIEW_API_TOKEN` entirely: even an
+empty value is forbidden in AWS mode. Invalid configuration returns 503;
+`/auth/health` remains an independent, unauthenticated readiness check.
+
+Login uses authorization code with S256 PKCE, state and nonce. The callback is
+always the configured `APP_ORIGIN` plus `/auth/callback`. The server verifies
+Cognito's ID-token signature, issuer, audience, use, expiry, verified email and
+login nonce. Only the ID token is retained, in an HttpOnly/Secure/SameSite=Lax
+host-only cookie that expires with it. No refresh token is stored. Sign in again
+when the one-hour token expires. The API receives that verified ID token;
+reviewer identity comes from its verified Cognito email. Browser code does not
+handle tokens. Logout requires a same-origin POST and clears the local session.
+
+`NEXT_OUTPUT=standalone` enables Lambda packaging; ordinary local builds keep
+the existing output. The ZIP build copies only standalone output, static assets,
+optional public assets and the executable `run.sh`. Keep local environment files
+out of `web/` before packaging. Build deployment artifacts on Linux x86_64 so
+native runtime libraries match Lambda; CI uses Linux. On a Mac, `make web-zip`
+uses Docker with the official Node 24 image and a curated temporary source
+workspace. `WEB_BUILD_IMAGE` can select an already prepared Node 24 Linux image
+when the default registry is unavailable; no host credentials are mounted. Terraform prepares the web
+Lambda and its separate HTTPS API; applying it requires explicit `apply 8b`
+approval after reviewing the saved plan.

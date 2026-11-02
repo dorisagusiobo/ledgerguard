@@ -1,4 +1,4 @@
-# Step 8a: deployment preparation
+# Review API and step 8b deployment preparation
 
 **No apply is authorized by this code.** The review API runs on Lambda behind an
 API Gateway HTTP API. There is no Function URL. Neon is created manually by the
@@ -52,7 +52,7 @@ chat. Remove temporary files securely afterward. Terraform never creates, reads,
 imports or manages parameter values, so real secrets never enter state. The default
 SSM-managed KMS key is used; no paid customer-managed key is provisioned.
 
-The Lambda environment contains only `LEDGERGUARD_ENV=aws` and the app parameter
+The API Lambda environment contains only `LEDGERGUARD_ENV=aws` and the app parameter
 name. It retrieves/decrypts the value with its scoped role, caches it only in the
 warm process, and never logs it. Redeploy/restart warm functions after rotation.
 The direct URL remains for owner-operated migrations, not the review API.
@@ -62,7 +62,7 @@ The direct URL remains for owner-operated migrations, not the review API.
 `make api-zip` exports the locked runtime
 requirements, installs Linux x86_64/Python 3.12 binary wheels with hashes, and writes
 `dist/api.zip`. No development packages, PDFs, secrets or environment files are
-packaged. The API ZIP must exist before a real Terraform plan. The builder checks
+packaged. Both API and web ZIPs must exist before a real Terraform plan. The builder checks
 the 250 MiB uncompressed Lambda package limit.
 
 Deployment uploads the ZIP to a private artifacts bucket in the Lambda region,
@@ -88,15 +88,23 @@ initialize this module with `terraform init -backend-config=backend.hcl`. The ba
 uses encryption, versioned S3 objects and native `use_lockfile` locking; no DynamoDB
 lock table is needed. Supply alert email and non-secret configuration privately,
 then produce a saved `terraform plan -out=tfplan`. Show its resource/cost/security
-summary. Only after the exact approval `apply 8a` may that saved plan be applied.
+summary. The 8b web changes require the exact approval `apply 8b` before that saved plan is applied.
 Never apply a newly changed plan under an older approval.
 
 ## Identity and permissions
 
 Cognito self sign-up is disabled. You create your own user, verify its email and
-choose its password. The public client supports authorization code flow; 8b will
-add the server-side web sign-in and PKCE exchange. Until then, callbacks default
-to localhost and no hosted screen is deployed.
+choose its password. The public client supports authorization code flow. The
+prepared 8b Terraform derives callback and logout URLs from the web HTTP API;
+the old callback/logout variables are removed. The web app now implements server-side Cognito sign-in with PKCE and the approved
+`aws-jwt-verify 5.2.1` dependency. Deployment and a signed-in review still require
+the owner's plan approval and interactive sign-in.
+
+The web Lambda uses Node.js 24, a Lambda Web Adapter layer, and a role with only
+log-write permissions. Its separate HTTP API forwards requests without an
+authorizer: the web app must authenticate requests itself. The API's JWT
+authorizer remains in place. There is no web Function URL. The layer is pinned
+to us-east-1; verify availability before using another region.
 
 Protected API paths use the Cognito JWT authorizer. This design uses the **ID
 token**, whose audience is the configured client and whose verified email identifies

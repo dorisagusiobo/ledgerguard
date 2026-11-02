@@ -2,13 +2,24 @@
 from pathlib import Path
 import shutil
 import subprocess
-import tomllib
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def deterministic_zip(package: Path, output: Path):
+    """Stable paths, timestamps and Unix permissions for Lambda artifacts."""
+    with ZipFile(output, 'w', compression=ZIP_DEFLATED) as archive:
+        for path in sorted(p for p in package.rglob('*') if p.is_file()):
+            info = ZipInfo(path.relative_to(package).as_posix(), date_time=(1980, 1, 1, 0, 0, 0))
+            info.create_system = 3
+            info.compress_type = ZIP_DEFLATED
+            info.external_attr = (0o100755 if path.stat().st_mode & 0o111 else 0o100644) << 16
+            archive.writestr(info, path.read_bytes())
+
+
 def build():
+    import tomllib
     project = tomllib.loads((ROOT / 'pyproject.toml').read_text())
     if not any(item.split('=')[0].split('>')[0].split('<')[0].strip() == 'mangum'
                for item in project['project']['dependencies']):
@@ -37,12 +48,7 @@ def build():
     if sum(p.stat().st_size for p in files) > 250 * 1024 * 1024:
         raise SystemExit('Package exceeds Lambda unzipped size limit')
     output = dist / 'api.zip'
-    with ZipFile(output, 'w', compression=ZIP_DEFLATED) as archive:
-        for path in files:
-            info = ZipInfo(path.relative_to(package).as_posix(), date_time=(1980, 1, 1, 0, 0, 0))
-            info.compress_type = ZIP_DEFLATED
-            info.external_attr = 0o644 << 16
-            archive.writestr(info, path.read_bytes())
+    deterministic_zip(package, output)
     print('Built dist/api.zip (Linux x86_64, Python 3.12)')
 
 

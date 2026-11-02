@@ -13,6 +13,13 @@ from ledgerguard.gateway import DEFAULT_PRICES, MODEL_ID, NOVA_MODEL_ID
 from ledgerguard.pipeline import PipelineModels
 
 
+def test_save_live_refused_before_aws_client(monkeypatch):
+    monkeypatch.setattr(boto3, 'client', lambda *a, **kw: pytest.fail('Must not create AWS client'))
+    with pytest.raises(SystemExit) as caught:
+        module.main(['--data', 'data/synthetic', '--live', '--save', '--max-cost', '0.50'])
+    assert caught.value.code == 2
+
+
 def run(case, tmp_path, *, client=None, **kwargs):
     root, pdfs, invoices, answers, _ = case
     client = client or FakeClient(pdfs, invoices, answers)

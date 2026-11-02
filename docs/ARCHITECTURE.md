@@ -5,8 +5,10 @@ generator, extractor, rule checks, policy checker, bounded investigator and read
 tools, scorer, per-step and pipeline evaluations, and governance gateway. Postgres
 persistence, an independent audit sink, a persistent monthly ledger and investigator
 checkpoints are implemented, along with the five-route review API and a local Next.js
-review screen. Deployment is not built yet, and pgvector clause retrieval is deferred
-(see step 3).
+review screen. Cognito web sign-in, standalone Lambda packaging, deployment
+Terraform and replay persistence are implemented locally. Deployment and the
+signed-in end-to-end review are not verified yet. pgvector clause retrieval is
+deferred (see step 3).
 
 ## 1. Problem
 

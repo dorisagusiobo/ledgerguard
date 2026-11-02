@@ -97,8 +97,8 @@ resource "aws_cognito_user_pool_client" "review" {
   allowed_oauth_flows                  = ["code"]
   allowed_oauth_scopes                 = ["openid", "email"]
   supported_identity_providers         = ["COGNITO"]
-  callback_urls                        = var.callback_urls
-  logout_urls                          = var.logout_urls
+  callback_urls                        = ["${aws_apigatewayv2_api.web.api_endpoint}/auth/callback"]
+  logout_urls                          = ["${aws_apigatewayv2_api.web.api_endpoint}/signed-out"]
   enable_token_revocation              = true
   access_token_validity                = 1
   id_token_validity                    = 1

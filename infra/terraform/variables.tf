@@ -18,23 +18,6 @@ variable "budget_alert_email" {
     error_message = "Supply an email for budget alerts."
   }
 }
-variable "callback_urls" {
-  type        = list(string)
-  default     = ["http://localhost:3000/auth/callback"]
-  description = "Cognito code-flow callbacks. Replace with the HTTPS web origin in 8b."
-  validation {
-    condition     = alltrue([for u in var.callback_urls : startswith(u, "https://") || startswith(u, "http://localhost:")])
-    error_message = "Callbacks must use HTTPS, except localhost during development."
-  }
-}
-variable "logout_urls" {
-  type    = list(string)
-  default = ["http://localhost:3000"]
-  validation {
-    condition     = alltrue([for u in var.logout_urls : startswith(u, "https://") || startswith(u, "http://localhost:")])
-    error_message = "Logout URLs must use HTTPS, except localhost during development."
-  }
-}
 variable "api_zip" {
   type        = string
   default     = "../../dist/api.zip"
@@ -45,4 +28,10 @@ variable "protect_user_pool" {
   type        = bool
   default     = true
   description = "Set false only for an explicitly approved teardown."
+}
+
+variable "web_zip" {
+  type        = string
+  default     = "../../dist/web.zip"
+  description = "Next.js standalone Lambda ZIP produced by make web-zip."
 }

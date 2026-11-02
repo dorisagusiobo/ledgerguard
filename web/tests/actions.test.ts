@@ -11,11 +11,11 @@ function form(note = '  Synthetic decision note  ') {
   const data = new FormData(); data.set('note', note); data.set('decision', 'reject'); return data;
 }
 describe('server decisions', () => {
-  it.each([422, 503])('returns the %i message without changing the submitted note', async status => {
+  it.each([401, 422, 503])('returns the %i message without changing the submitted note', async status => {
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({detail: status === 503 ? 'Service unavailable' : [{loc: ['body', 'note'], msg: 'Note is required'}]}, {status})));
     const data = form();
     const state = await submitDecision('12', {message: ''}, data);
-    expect(state.message).toBe(status === 503 ? 'Service unavailable' : 'Note is required');
+    expect(state.message).toBe(status === 503 ? 'Service unavailable' : status === 401 ? 'Review API authentication failed. Check the server configuration.' : 'Note is required');
     expect(data.get('note')).toBe('  Synthetic decision note  ');
     expect(redirect).not.toHaveBeenCalled();
     expect(revalidatePath).not.toHaveBeenCalled();

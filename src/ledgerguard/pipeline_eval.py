@@ -2,6 +2,7 @@
 import argparse
 from datetime import datetime, timezone
 from decimal import Decimal
+from hashlib import sha256
 import json
 from pathlib import Path
 from time import perf_counter
@@ -53,13 +54,16 @@ class StageMeter:
 
 
 def compare(data: Path, *, client, max_cost: Decimal, audit_path: Path,
-            split='dev', limit=None, models: PipelineModels = PipelineModels()) -> dict:
+            split='dev', limit=None, models: PipelineModels = PipelineModels(), save=False) -> dict:
     """Score the entire selected cohort, including unattempted/referral documents.
 
     PDF filenames supply trusted document identity for scoring. Extracted invoice
     numbers remain untouched inside the pipeline and are scored separately.
     Cost/time per invoice use selected documents, including incomplete runs.
     """
+    if save and not isinstance(client, ReplayClient):
+        raise ValueError('--save requires --replay; live saving is not supported')
+    started_at = datetime.now(timezone.utc)
     if split not in {'dev', 'test'} or (limit is not None and (type(limit) is not int or limit < 1)):
         raise ValueError('Use split dev/test and a positive limit')
     if any(model not in MODELS.values() for model in (models.extract, models.policy, models.investigate)):
@@ -117,6 +121,22 @@ def compare(data: Path, *, client, max_cost: Decimal, audit_path: Path,
                     for name, values in meter.stages.items()}
     metadata_path = data / 'metadata.json'
     metadata = json.loads(metadata_path.read_text()) if metadata_path.exists() else {}
+    if save:
+        if result.stopped or result.skipped_stages:
+            raise ValueError('Only a successful complete replay can be saved')
+        from ledgerguard.db import pooled_connection, runtime_database_url
+        from ledgerguard.store import RunMetadata, save_run
+        records = [json.loads(line) for line in audit_path.read_text().splitlines() if line.strip()]
+        run_metadata = RunMetadata(
+            run_id=result.pipeline_run_id, started_at=started_at,
+            finished_at=datetime.now(timezone.utc),
+            model_ids={'extract': models.extract, 'policy': models.policy, 'investigate': models.investigate},
+            document_hashes={n: sha256(pdfs[n]).hexdigest() for n in selected},
+            git_revision=client.header.get('git_commit'), mode='replay', audit_records=records)
+        with pooled_connection(runtime_database_url()) as conn:
+            if conn.execute('SELECT current_user').fetchone()[0] != 'ledgerguard_app':
+                raise ValueError('Replay saving requires ledgerguard_app')
+            save_run(conn, result, run_metadata)
     return {
         'pipeline_run_id': result.pipeline_run_id,
         'mode': 'replayed' if isinstance(client, ReplayClient) else 'recorded' if isinstance(client, RecordingClient) else 'live',
@@ -197,11 +217,14 @@ def main(argv=None):
     mode.add_argument('--live', action='store_true')
     mode.add_argument('--replay', type=Path)
     parser.add_argument('--record', type=Path)
+    parser.add_argument('--save', action='store_true', help='Persist a successful replay using the app database role')
     parser.add_argument('--json', type=Path, dest='json_path')
     parser.add_argument('--audit', type=Path)
     for stage, default in [('extract', 'nova'), ('policy', 'nova'), ('investigate', 'sonnet')]:
         parser.add_argument(f'--{stage}-model', choices=MODELS, default=default)
     args = parser.parse_args(argv)
+    if args.save and not args.replay:
+        parser.error('--save requires --replay; no AWS client was created')
     if (args.record or args.replay) and args.limit is not None:
         parser.error('--limit cannot be used with --record or --replay')
     if args.record and not args.live:
@@ -243,7 +266,7 @@ def main(argv=None):
             if args.record:
                 client = RecordingClient(client, args.record, header)
         report = compare(args.data, client=client, max_cost=max_cost, audit_path=audit, split=args.split,
-                         limit=args.limit, models=models)
+                         limit=args.limit, models=models, save=args.save)
     except RecordingMismatch as error:
         parser.exit(1, str(error) + '\n')
     if args.json_path:

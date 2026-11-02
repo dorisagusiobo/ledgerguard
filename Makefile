@@ -1,4 +1,7 @@
-.PHONY: api-zip terraform-fmt terraform-validate
+.PHONY: api-zip web-zip terraform-fmt terraform-validate
+web-zip:
+	uv run python scripts/build_web.py
+
 api-zip:
 	uv run python scripts/build_api.py
 

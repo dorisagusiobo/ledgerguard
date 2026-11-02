@@ -31,19 +31,19 @@ def test_migrations_idempotent_and_checksum_protected(db_owner, tmp_path):
     assert migrate(db_owner) == []
     initial.unlink()
     # Keep one pending file so the missing-applied-file check is exercised.
-    (initial.parent / '005_pending.sql').write_text('SELECT 1;')
+    (initial.parent / '006_pending.sql').write_text('SELECT 1;')
     with pytest.raises(ValueError, match='missing or changed'):
         migrate(db_owner, initial.parent)
 
 
 def test_pending_migration_ddl_and_history_roll_back(db_owner, tmp_path):
     copytree(MIGRATIONS, tmp_path / 'migrations')
-    (tmp_path / 'migrations/005_broken.sql').write_text(
+    (tmp_path / 'migrations/006_broken.sql').write_text(
         'CREATE TABLE should_rollback (id INTEGER); SELECT definitely_missing_column;')
     with pytest.raises(psycopg.Error):
         migrate(db_owner, tmp_path / 'migrations')
     assert db_owner.execute("SELECT to_regclass('should_rollback')").fetchone()[0] is None
-    assert db_owner.execute("SELECT count(*) FROM schema_migrations WHERE name='005_broken.sql'").fetchone()[0] == 0
+    assert db_owner.execute("SELECT count(*) FROM schema_migrations WHERE name='006_broken.sql'").fetchone()[0] == 0
 
 
 def audit_record():
