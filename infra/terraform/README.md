@@ -117,8 +117,8 @@ Only `/health` is unauthenticated. ANY method forwarding on the five known paths
 preserves FastAPI's method rejection; it does not add application endpoints.
 
 The API role can read only the pooled app parameter and write its own logs. It has
-no Bedrock grant. A separate unattached policy scopes the two current inference
-profiles and underlying model IDs for the future 8c role. No wildcard model IDs
+no Bedrock grant. A separate policy scopes the two current inference
+profiles and underlying model IDs, and is attached only to the 8c pipeline role. No wildcard model IDs
 are granted. The API timeout is 30 seconds to match HTTP API's synchronous limit;
 the 198-second pipeline belongs in the separate asynchronous 8c function.
 CloudWatch API/Lambda log groups retain records for 14 days and access logs omit
@@ -145,3 +145,87 @@ Delete their synthetic data/project and parameters yourself only when no longer
 needed. The bootstrap state bucket is protected from destruction and may retain
 versioned state; do not remove it while any stack still uses it. Removing that
 protection and deleting versions/bucket requires a separate approved teardown.
+
+## Step 8c: S3 pipeline runner (built; deployed smoke not verified)
+
+The uploader and separate asynchronous Lambda are built and covered by offline
+and local Postgres tests. They are not verified against a deployed S3-to-Lambda-to-
+Neon run until an explicitly authorized live smoke run succeeds. No code or test
+uploads a real batch or invokes Bedrock automatically. Applying infrastructure,
+uploading a trigger manifest, and the live smoke run require specific approval.
+The API role retains no Bedrock permission and the web Lambda is unchanged.
+
+`make api-zip` packages both handlers in the same versioned artifact. The pipeline
+handler is `ledgerguard.pipeline_lambda.handler`. The builder stamps
+`ledgerguard/build_revision.txt` with `git rev-parse HEAD`, plus `-dirty` when the
+worktree has changes; live run metadata preserves that revision. Build artifacts
+must be regenerated after source changes and before reviewing a deployment plan.
+
+After deployment is approved, the `pipeline_bucket` output identifies a separate
+private bucket. To submit synthetic dev PDFs, use:
+
+```sh
+uv run python -m ledgerguard.pipeline_upload --data data/synthetic-v2 --split dev --limit 3 --bucket BUCKET
+```
+
+Replace `BUCKET` with that output. This command is the spending trigger: it writes
+only selected dev PDFs and the explicit `policy.md`, `contracts.json`, `history.json`
+reference allowlist. It never uploads invoice JSON, answer keys or held-out test
+PDFs. It validates all inputs before uploading and publishes the manifest last,
+then prints the new UUID batch ID. It refuses the test split. A failed upload does
+not publish its manifest; retry with a fresh batch ID rather than reusing objects.
+
+Bucket layout:
+
+```text
+batches/<batch_id>/manifest.json
+batches/<batch_id>/invoices/<document_id>.pdf
+batches/<batch_id>/reference/{policy.md,contracts.json,history.json}
+claims/<batch_id>.json
+results/<batch_id>.json
+```
+
+The bucket blocks public access, enforces owner ownership, AES256 encryption and
+TLS, and expires all objects after 14 days. The notification matches only
+`batches/` plus `/manifest.json`; the handler additionally checks the exact UUID
+key and bucket and requires exactly one S3 record. It rejects extra manifest
+fields, duplicate/unsafe document IDs, more than 40 documents, PDFs over 5 MiB,
+non-PDF bytes and SHA-256 mismatches. Manifests are capped at 64 KiB and each
+reference file at 5 MiB to bound untrusted input memory.
+
+After PDF validation, an atomic `IfNoneMatch='*'` claim prevents duplicate events
+from starting another paid run. An existing claim or a conditional-write conflict
+returns without running a model. Claims are never reused. A failed batch needs a
+new ID. Results also use conditional writes so a later event cannot overwrite the
+first outcome. Invalid events without a trusted bucket/key have no safe result
+address; they fail without writing an object. Addressable batch failures record
+only `status=failed` and the exception class. The Lambda boundary rethrows a
+sanitized `PipelineFailure` with that class name, preventing the runtime from
+logging the original exception message. No document text, model output or
+connection value is logged.
+
+The runner loads references only after claiming, then uses the existing gateway,
+Postgres audit sink and monthly ledger. Checkpoints use an app-role pooled
+connection with prepared statements disabled and strict serialization; runtime
+code never sets up checkpoints or migrates schema. Saving checks the app role
+again, persists completed, stopped and partial results with `mode=live` and every
+submitted PDF hash, and writes summary counts, cost, status and run ID to S3. The
+summary's `stopped_reason` is the gateway's stop code. A saved run appears through
+the existing review API; the runner never makes a review decision.
+
+`pipeline_batch_max_cost` is a server-controlled USD string, default `"0.50"`.
+Terraform and the handler permit lowering it to zero but not raising the existing
+$0.50 ceiling. Manifest values cannot change it. The per-invoice 20-call/$0.50
+and persistent $10/month gateway caps remain unchanged. Shared batch call/tool
+limits are document count times 20/10. Bedrock uses us-east-1, one SDK attempt,
+a 5-second connection timeout and a 60-second read timeout. S3 SDK operations
+also have only one attempt.
+
+The pipeline Lambda uses Python 3.12/x86_64, 1024 MiB, timeout 900 seconds and
+reserved concurrency 1, with no Function URL. Asynchronous function-error retries
+are zero and maximum event age is 3600 seconds. Duplicate delivery is still
+possible and is handled by the claim. Its role can write only its own 14-day logs,
+read only the app SSM parameter and `batches/*`, and write only `claims/*` and
+`results/*`. It cannot write a trigger batch or read the direct owner parameter. The handler
+never appends review decisions. The S3 invocation permission is scoped to the bucket ARN
+and account. Infrastructure preparation and validation do not run the pipeline.

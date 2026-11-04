@@ -6,3 +6,4 @@ output "cognito_domain" { value = "https://${aws_cognito_user_pool_domain.review
 output "app_database_parameter_name" { value = local.app_parameter }
 output "direct_database_parameter_name" { value = local.direct_parameter }
 output "pipeline_bedrock_policy_arn" { value = aws_iam_policy.pipeline_bedrock.arn }
+output "pipeline_bucket" { value = aws_s3_bucket.pipeline.id }

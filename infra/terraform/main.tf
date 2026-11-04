@@ -55,7 +55,7 @@ resource "aws_lambda_function" "api" {
   depends_on = [aws_iam_role_policy.api]
 }
 # Deliberately no aws_lambda_function_url and no Bedrock grant on the review API.
-# Scoped Bedrock policy is prepared for the separate pipeline role in 8c.
+# Scoped Bedrock policy is attached only to the separate 8c pipeline role.
 resource "aws_iam_policy" "pipeline_bedrock" {
   name = "${var.name}-pipeline-bedrock"
   policy = jsonencode({ Version = "2012-10-17", Statement = [

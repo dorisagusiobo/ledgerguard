@@ -7,6 +7,12 @@ from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def git_revision():
+    revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
+    dirty = subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True)
+    return revision + ('-dirty' if dirty else '')
+
+
 def deterministic_zip(package: Path, output: Path):
     """Stable paths, timestamps and Unix permissions for Lambda artifacts."""
     with ZipFile(output, 'w', compression=ZIP_DEFLATED) as archive:
@@ -40,6 +46,7 @@ def build():
                     '-r', str(requirements)], cwd=ROOT, check=True)
     shutil.copytree(ROOT / 'src/ledgerguard', package / 'ledgerguard',
                     ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
+    (package / 'ledgerguard/build_revision.txt').write_text(git_revision() + '\n')
     if not (package / 'mangum/__init__.py').is_file():
         raise SystemExit('Mangum is missing from Lambda package')
     files = sorted(p for p in package.rglob('*') if p.is_file())

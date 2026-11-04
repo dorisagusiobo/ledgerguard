@@ -8,7 +8,9 @@ checkpoints are implemented, along with the five-route review API and a local Ne
 review screen. Cognito web sign-in, standalone Lambda packaging, deployment
 Terraform and replay persistence are implemented locally. Deployment and the
 signed-in end-to-end review are not verified yet. pgvector clause retrieval is
-deferred (see step 3).
+deferred (see step 3). Step 8c is built: a dev-only S3 uploader and a separate
+asynchronous Lambda run the governed pipeline and persist live results to Neon.
+The deployed 8c smoke run is not verified yet.
 
 ## 1. Problem
 
@@ -18,6 +20,34 @@ approval limits. LedgerGuard extracts each invoice, checks the charges, and repo
 every finding with a dollar amount, source evidence and the exact policy or contract
 clause. A person reviews every finding; LedgerGuard never pays or changes financial
 records on its own.
+
+## Step 8c: asynchronous synthetic batches (built, not smoke-verified)
+
+A synthetic dev batch reaches the pipeline through a separate private S3 bucket.
+The uploader sends only dev PDFs and three allowlisted reference files, with a
+strict manifest written last. Invoice JSON, answer keys and the held-out test
+split are excluded. Only an exact `batches/<uuid>/manifest.json` event can start
+work. The handler validates 1–40 uniquely identified PDFs, checks their sizes,
+PDF signatures and hashes, then atomically claims the batch before any model call.
+Duplicate deliveries do not repeat a run; failed claims are never reused.
+
+The separate 900-second Lambda uses the existing gateway with the persistent
+monthly ledger, independent database audit sink and pooled Postgres checkpoints.
+It never sets up schema at runtime. The server's default $0.50 batch ceiling is
+set by Terraform and cannot be overridden in a manifest; invoice and monthly caps
+are unchanged. Function-error retries are disabled, SDK clients make one attempt,
+and reserved concurrency is one. The API role has no Bedrock grant; the web
+Lambda is unchanged.
+
+Completed, stopped and partial results are saved under `ledgerguard_app` with
+`mode=live`, all submitted PDF hashes and the artifact's git revision. The run
+then uses the existing API and human review flow. S3 results contain only summary
+IDs, counts, costs, status and stop reason. Failures record only an exception
+class and are rethrown without the original message. Logs exclude document text,
+model output and credentials. Bucket contents expire after 14 days. See
+[the deployment guide](../infra/terraform/README.md) for paths, commands and IAM
+boundaries. End-to-end deployment is unverified until an approved smoke run
+uploads a synthetic manifest and its persisted run appears on the review site.
 
 ## 2. User
 

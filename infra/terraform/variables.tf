@@ -35,3 +35,13 @@ variable "web_zip" {
   default     = "../../dist/web.zip"
   description = "Next.js standalone Lambda ZIP produced by make web-zip."
 }
+
+variable "pipeline_batch_max_cost" {
+  type        = string
+  default     = "0.50"
+  description = "Server-controlled USD budget for one pipeline batch; cannot raise the existing $0.50 cap."
+  validation {
+    condition     = can(tonumber(var.pipeline_batch_max_cost)) && try(tonumber(var.pipeline_batch_max_cost) >= 0 && tonumber(var.pipeline_batch_max_cost) <= 0.50, false)
+    error_message = "The batch budget must be between 0 and 0.50 USD."
+  }
+}

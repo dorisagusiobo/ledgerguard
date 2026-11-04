@@ -129,6 +129,8 @@ def test_lambda_packaging_uses_locked_linux_wheels_without_secrets(tmp_path, mon
     source = tmp_path / 'src/ledgerguard'
     source.mkdir(parents=True)
     (source / 'api.py').write_text('def handler(event, context): return {}\n')
+    (source / 'pipeline_lambda.py').write_text('def handler(event, context): return {}\n')
+    monkeypatch.setattr(builder, 'git_revision', lambda: 'a' * 40 + '-dirty')
     # Deliberately outside src/: neither should ever enter the ZIP.
     (tmp_path / 'not-for-package.txt').write_text('synthetic private fixture')
     (tmp_path / 'synthetic.pdf').write_bytes(b'%PDF synthetic')
@@ -149,7 +151,9 @@ def test_lambda_packaging_uses_locked_linux_wheels_without_secrets(tmp_path, mon
     assert commands[1][commands[1].index('--python-version') + 1] == '3.12'
     assert '--require-hashes' in commands[1]
     with ZipFile(tmp_path / 'dist/api.zip') as archive:
-        assert set(archive.namelist()) == {'ledgerguard/api.py', 'mangum/__init__.py'}
+        assert set(archive.namelist()) == {'ledgerguard/api.py', 'ledgerguard/pipeline_lambda.py',
+                                         'ledgerguard/build_revision.txt', 'mangum/__init__.py'}
+        assert archive.read('ledgerguard/build_revision.txt') == ('a' * 40 + '-dirty\n').encode()
 
 
 @pytest.mark.parametrize('sslmode', ['require', 'verify-ca', 'verify-full'])
