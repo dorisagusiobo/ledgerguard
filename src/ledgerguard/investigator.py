@@ -60,6 +60,7 @@ class State(TypedDict):
     messages: list[dict]
     turns: int
     repairs: int
+    tools_succeeded: int
     seen: list[str]
     tool_uses: list[dict]
     outcome: dict | None
@@ -175,7 +176,9 @@ def investigate(invoice: Invoice, findings: list[Finding], *, tools: ReadOnlyToo
             results.append({'toolResult': {'toolUseId': use['toolUseId'], 'status': 'success',
                                            'content': [{'json': result}]}})
         return {'messages': [*state['messages'], {'role': 'user', 'content': results}],
-                'seen': sorted(seen), 'route': 'model'}
+                'seen': sorted(seen), 'route': 'model',
+                'tools_succeeded': state['tools_succeeded'] + sum(
+                    result['toolResult']['status'] == 'success' for result in results)}
 
     def finish(state: State):
         try:
@@ -187,7 +190,7 @@ def investigate(invoice: Invoice, findings: list[Finding], *, tools: ReadOnlyToo
             locations = [[part if type(part) is int or part in fields else '<unknown_field>'
                           for part in item['loc']]
                          for item in error.errors(include_input=False, include_context=False, include_url=False)]
-            if state['repairs'] == 0 and state['turns'] < max_turns:
+            if state['repairs'] == 0 and state['turns'] < max_turns and state['tools_succeeded'] > 0:
                 message = ('submit_notes was rejected at ' + json.dumps(locations)
                            + '. Resubmit every note. Each summary must be non-empty and under 500 characters.')
                 result = {'toolResult': {'toolUseId': state['tool_uses'][0]['toolUseId'],
@@ -215,7 +218,7 @@ def investigate(invoice: Invoice, findings: list[Finding], *, tools: ReadOnlyToo
                                 {'model': 'model', 'end': END})
     compiled = graph.compile(checkpointer=checkpointer)
     try:
-        result = compiled.invoke({'messages': [initial_message(invoice, findings)], 'turns': 0, 'repairs': 0,
+        result = compiled.invoke({'messages': [initial_message(invoice, findings)], 'turns': 0, 'repairs': 0, 'tools_succeeded': 0,
                                   'seen': sorted({invoice.invoice_number} | {number for f in findings for number in f.invoice_numbers}),
                                   'tool_uses': [], 'outcome': None, 'route': 'model'},
                                  config={'recursion_limit': 2 * max_turns + 2,
