@@ -4,7 +4,7 @@
 
 LedgerGuard audits synthetic invoices and sends evidence-backed findings for human review.
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for Version 1 scope and design.
-The repository is a scaffold; do not describe planned features as implemented.
+Version 1 is built and deployed; do not describe planned or deferred features as implemented.
 
 ## Commands
 
@@ -16,11 +16,11 @@ The repository is a scaffold; do not describe planned features as implemented.
 
 ## Layout
 
-- `src/ledgerguard/` — Python package and CLI scaffold.
-- `tests/` — offline automated tests; currently a placeholder.
-- `evals/` — synthetic evaluations and expected findings; currently a placeholder.
+- `src/ledgerguard/` — pipeline, gateway, rules, tools, review API and evaluation CLIs.
+- `tests/` — offline automated tests, plus Postgres integration tests in `tests/db/`.
+- `evals/` — dev replay recording and saved evaluation evidence.
 - `data/synthetic/` — generated fake documents; git-ignored, so regenerate them rather than commit them.
-- `infra/` — planned Terraform infrastructure.
+- `infra/` — Terraform infrastructure and local Postgres setup.
 - `docs/` — architecture and project documentation.
 
 ## Code rules
