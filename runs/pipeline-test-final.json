@@ -1,0 +1,863 @@
+{
+  "baseline": {
+    "by_type": {
+      "arithmetic_error": {
+        "amount_accuracy": 1.0,
+        "caught": 2,
+        "citation_accuracy": 1.0,
+        "expected": 2,
+        "false_flags": 0,
+        "missed": 0,
+        "precision": 1.0,
+        "recall": 1.0
+      },
+      "contract_overcharge": {
+        "amount_accuracy": 1.0,
+        "caught": 2,
+        "citation_accuracy": 1.0,
+        "expected": 2,
+        "false_flags": 0,
+        "missed": 0,
+        "precision": 1.0,
+        "recall": 1.0
+      },
+      "duplicate": {
+        "amount_accuracy": 1.0,
+        "caught": 2,
+        "citation_accuracy": 1.0,
+        "expected": 2,
+        "false_flags": 0,
+        "missed": 0,
+        "precision": 1.0,
+        "recall": 1.0
+      },
+      "extraction_issue": {
+        "amount_accuracy": null,
+        "caught": 0,
+        "citation_accuracy": null,
+        "expected": 0,
+        "false_flags": 0,
+        "missed": 0,
+        "precision": null,
+        "recall": null
+      },
+      "policy_violation": {
+        "amount_accuracy": 1.0,
+        "caught": 2,
+        "citation_accuracy": 1.0,
+        "expected": 4,
+        "false_flags": 0,
+        "missed": 2,
+        "precision": 1.0,
+        "recall": 0.5
+      },
+      "split_purchase": {
+        "amount_accuracy": 1.0,
+        "caught": 2,
+        "citation_accuracy": 1.0,
+        "expected": 2,
+        "false_flags": 0,
+        "missed": 0,
+        "precision": 1.0,
+        "recall": 1.0
+      },
+      "unusual_amount": {
+        "amount_accuracy": 1.0,
+        "caught": 2,
+        "citation_accuracy": 1.0,
+        "expected": 2,
+        "false_flags": 0,
+        "missed": 0,
+        "precision": 1.0,
+        "recall": 1.0
+      }
+    },
+    "clean_invoices": {
+      "total": 1,
+      "wrongly_flagged": 0
+    },
+    "false_flags": [],
+    "missed_answers": [
+      {
+        "amount_at_issue": "182.00",
+        "clause_id": "POL-4",
+        "invoice_numbers": [
+          "INV-2026-0049"
+        ],
+        "type": "policy_violation"
+      },
+      {
+        "amount_at_issue": "78.00",
+        "clause_id": "POL-4",
+        "invoice_numbers": [
+          "INV-2026-0057"
+        ],
+        "type": "policy_violation"
+      }
+    ],
+    "overall": {
+      "amount_accuracy": 1.0,
+      "caught": 12,
+      "citation_accuracy": 1.0,
+      "expected": 14,
+      "false_flags": 0,
+      "missed": 2,
+      "precision": 1.0,
+      "recall": 0.8571428571428571
+    },
+    "referred_to_review": 0,
+    "split": "test"
+  },
+  "batch": {
+    "calls": 69,
+    "cost": "0.2915775",
+    "max_calls": 380,
+    "max_cost": "0.50",
+    "max_tool_calls": 190,
+    "tool_calls": 42
+  },
+  "budgets": {
+    "INV-2026-0003": {
+      "calls": 4,
+      "cost": "0.0181670"
+    },
+    "INV-2026-0003-A": {
+      "calls": 2,
+      "cost": "0.0015105"
+    },
+    "INV-2026-0004": {
+      "calls": 4,
+      "cost": "0.0181070"
+    },
+    "INV-2026-0004-A": {
+      "calls": 2,
+      "cost": "0.0015105"
+    },
+    "INV-2026-0005": {
+      "calls": 2,
+      "cost": "0.0014974"
+    },
+    "INV-2026-0043": {
+      "calls": 5,
+      "cost": "0.0288500"
+    },
+    "INV-2026-0044": {
+      "calls": 4,
+      "cost": "0.0175550"
+    },
+    "INV-2026-0045": {
+      "calls": 4,
+      "cost": "0.0177248"
+    },
+    "INV-2026-0046": {
+      "calls": 5,
+      "cost": "0.0294028"
+    },
+    "INV-2026-0047": {
+      "calls": 2,
+      "cost": "0.0015208"
+    },
+    "INV-2026-0048": {
+      "calls": 4,
+      "cost": "0.0179013"
+    },
+    "INV-2026-0049": {
+      "calls": 4,
+      "cost": "0.0177925"
+    },
+    "INV-2026-0051": {
+      "calls": 4,
+      "cost": "0.0181370"
+    },
+    "INV-2026-0052": {
+      "calls": 4,
+      "cost": "0.0178220"
+    },
+    "INV-2026-0053": {
+      "calls": 4,
+      "cost": "0.0175298"
+    },
+    "INV-2026-0054": {
+      "calls": 5,
+      "cost": "0.0294448"
+    },
+    "INV-2026-0055": {
+      "calls": 2,
+      "cost": "0.0015208"
+    },
+    "INV-2026-0056": {
+      "calls": 4,
+      "cost": "0.0177663"
+    },
+    "INV-2026-0057": {
+      "calls": 4,
+      "cost": "0.0178172"
+    }
+  },
+  "cost": {
+    "per_invoice": "0.01534618421052631578947368421",
+    "stage_total": "0.2915775",
+    "stages_reconcile": true,
+    "total": "0.2915775",
+    "unattributed": "0E-7"
+  },
+  "end_to_end": {
+    "by_type": {
+      "arithmetic_error": {
+        "amount_accuracy": 1.0,
+        "caught": 2,
+        "citation_accuracy": 1.0,
+        "expected": 2,
+        "false_flags": 0,
+        "missed": 0,
+        "precision": 1.0,
+        "recall": 1.0
+      },
+      "contract_overcharge": {
+        "amount_accuracy": 1.0,
+        "caught": 2,
+        "citation_accuracy": 1.0,
+        "expected": 2,
+        "false_flags": 0,
+        "missed": 0,
+        "precision": 1.0,
+        "recall": 1.0
+      },
+      "duplicate": {
+        "amount_accuracy": 1.0,
+        "caught": 2,
+        "citation_accuracy": 1.0,
+        "expected": 2,
+        "false_flags": 0,
+        "missed": 0,
+        "precision": 1.0,
+        "recall": 1.0
+      },
+      "extraction_issue": {
+        "amount_accuracy": null,
+        "caught": 0,
+        "citation_accuracy": null,
+        "expected": 0,
+        "false_flags": 0,
+        "missed": 0,
+        "precision": null,
+        "recall": null
+      },
+      "policy_violation": {
+        "amount_accuracy": 1.0,
+        "caught": 4,
+        "citation_accuracy": 1.0,
+        "expected": 4,
+        "false_flags": 0,
+        "missed": 0,
+        "precision": 1.0,
+        "recall": 1.0
+      },
+      "split_purchase": {
+        "amount_accuracy": 1.0,
+        "caught": 2,
+        "citation_accuracy": 1.0,
+        "expected": 2,
+        "false_flags": 0,
+        "missed": 0,
+        "precision": 1.0,
+        "recall": 1.0
+      },
+      "unusual_amount": {
+        "amount_accuracy": 1.0,
+        "caught": 2,
+        "citation_accuracy": 1.0,
+        "expected": 2,
+        "false_flags": 0,
+        "missed": 0,
+        "precision": 1.0,
+        "recall": 1.0
+      }
+    },
+    "clean_invoices": {
+      "total": 1,
+      "wrongly_flagged": 0
+    },
+    "false_flags": [],
+    "missed_answers": [],
+    "overall": {
+      "amount_accuracy": 1.0,
+      "caught": 14,
+      "citation_accuracy": 1.0,
+      "expected": 14,
+      "false_flags": 0,
+      "missed": 0,
+      "precision": 1.0,
+      "recall": 1.0
+    },
+    "referred_to_review": 0,
+    "split": "test"
+  },
+  "extraction": {
+    "accuracy": 1.0,
+    "exact_matches": 19,
+    "invoice_number_mismatch_count": 0,
+    "invoice_number_mismatches": [],
+    "selected": 19,
+    "successful": 19
+  },
+  "findings": [
+    {
+      "amount_at_issue": "7.00",
+      "calculation": "subtotal + tax vs total: |195.00 - 202.00| = 7.00; Amount at issue: |stated total 202.00 - correct total 195.00| = 7.00",
+      "citation": null,
+      "confidence": 1.0,
+      "evidence": [
+        {
+          "page": 1,
+          "text": "Test item 4 | 15 | 13.00 | 195.00"
+        }
+      ],
+      "invoice_numbers": [
+        "INV-2026-0044"
+      ],
+      "no_clause_reason": "no applicable clause identified",
+      "status": "pending",
+      "type": "arithmetic_error"
+    },
+    {
+      "amount_at_issue": "7.00",
+      "calculation": "subtotal + tax vs total: |91.00 - 98.00| = 7.00; Amount at issue: |stated total 98.00 - correct total 91.00| = 7.00",
+      "citation": null,
+      "confidence": 1.0,
+      "evidence": [
+        {
+          "page": 1,
+          "text": "Test item 4 | 7 | 13.00 | 91.00"
+        }
+      ],
+      "invoice_numbers": [
+        "INV-2026-0052"
+      ],
+      "no_clause_reason": "no applicable clause identified",
+      "status": "pending",
+      "type": "arithmetic_error"
+    },
+    {
+      "amount_at_issue": "28.00",
+      "calculation": "Test item 3: (14.00 - 12.00) \u00d7 14 = 28.00; Total overcharge = 28.00",
+      "citation": {
+        "clause_id": "CON-VEN-003-1",
+        "document": "contracts.json",
+        "quote": "Test item 3: $12.00 per unit",
+        "version": "v1"
+      },
+      "confidence": 1.0,
+      "evidence": [
+        {
+          "page": 1,
+          "text": "Test item 3 | 14 | 14.00 | 196.00"
+        }
+      ],
+      "invoice_numbers": [
+        "INV-2026-0043"
+      ],
+      "no_clause_reason": null,
+      "status": "pending",
+      "type": "contract_overcharge"
+    },
+    {
+      "amount_at_issue": "26.00",
+      "calculation": "Test item 3: (14.00 - 12.00) \u00d7 13 = 26.00; Total overcharge = 26.00",
+      "citation": {
+        "clause_id": "CON-VEN-003-1",
+        "document": "contracts.json",
+        "quote": "Test item 3: $12.00 per unit",
+        "version": "v1"
+      },
+      "confidence": 1.0,
+      "evidence": [
+        {
+          "page": 1,
+          "text": "Test item 3 | 13 | 14.00 | 182.00"
+        }
+      ],
+      "invoice_numbers": [
+        "INV-2026-0051"
+      ],
+      "no_clause_reason": null,
+      "status": "pending",
+      "type": "contract_overcharge"
+    },
+    {
+      "amount_at_issue": "156.00",
+      "calculation": "Duplicate of INV-2026-0003: total 156.00",
+      "citation": null,
+      "confidence": 1.0,
+      "evidence": [
+        {
+          "page": 1,
+          "text": "Test item 3 | 13 | 12.00 | 156.00"
+        },
+        {
+          "page": 1,
+          "text": "Test item 3 | 13 | 12.00 | 156.00"
+        }
+      ],
+      "invoice_numbers": [
+        "INV-2026-0003",
+        "INV-2026-0003-A"
+      ],
+      "no_clause_reason": "no applicable clause identified",
+      "status": "pending",
+      "type": "duplicate"
+    },
+    {
+      "amount_at_issue": "208.00",
+      "calculation": "Duplicate of INV-2026-0004: total 208.00",
+      "citation": null,
+      "confidence": 1.0,
+      "evidence": [
+        {
+          "page": 1,
+          "text": "Test item 4 | 16 | 13.00 | 208.00"
+        },
+        {
+          "page": 1,
+          "text": "Test item 4 | 16 | 13.00 | 208.00"
+        }
+      ],
+      "invoice_numbers": [
+        "INV-2026-0004",
+        "INV-2026-0004-A"
+      ],
+      "no_clause_reason": "no applicable clause identified",
+      "status": "pending",
+      "type": "duplicate"
+    },
+    {
+      "amount_at_issue": "1056.00",
+      "calculation": "1056.00 > 1000; no PO number",
+      "citation": {
+        "clause_id": "POL-1",
+        "document": "policy.md",
+        "quote": "POL-1: Invoices over $1,000 require a purchase order number.",
+        "version": "Synthetic spending policy v1"
+      },
+      "confidence": 1.0,
+      "evidence": [
+        {
+          "page": 1,
+          "text": "Test item 2 | 96 | 11.00 | 1056.00"
+        }
+      ],
+      "invoice_numbers": [
+        "INV-2026-0045"
+      ],
+      "no_clause_reason": null,
+      "status": "pending",
+      "type": "policy_violation"
+    },
+    {
+      "amount_at_issue": "1188.00",
+      "calculation": "1188.00 > 1000; no PO number",
+      "citation": {
+        "clause_id": "POL-1",
+        "document": "policy.md",
+        "quote": "POL-1: Invoices over $1,000 require a purchase order number.",
+        "version": "Synthetic spending policy v1"
+      },
+      "confidence": 1.0,
+      "evidence": [
+        {
+          "page": 1,
+          "text": "Test item 2 | 108 | 11.00 | 1188.00"
+        }
+      ],
+      "invoice_numbers": [
+        "INV-2026-0053"
+      ],
+      "no_clause_reason": null,
+      "status": "pending",
+      "type": "policy_violation"
+    },
+    {
+      "amount_at_issue": "5290.00",
+      "calculation": "Combined total 5290.00 > 5000 within 7 days",
+      "citation": {
+        "clause_id": "POL-3",
+        "document": "policy.md",
+        "quote": "POL-3: Do not split a purchase across invoices within 7 days to avoid POL-2.",
+        "version": "Synthetic spending policy v1"
+      },
+      "confidence": 1.0,
+      "evidence": [
+        {
+          "page": 1,
+          "text": "Test item 1 | 253 | 10.00 | 2530.00"
+        },
+        {
+          "page": 1,
+          "text": "Test item 1 | 276 | 10.00 | 2760.00"
+        }
+      ],
+      "invoice_numbers": [
+        "INV-2026-0046",
+        "INV-2026-0047"
+      ],
+      "no_clause_reason": null,
+      "status": "pending",
+      "type": "split_purchase"
+    },
+    {
+      "amount_at_issue": "5480.00",
+      "calculation": "Combined total 5480.00 > 5000 within 7 days",
+      "citation": {
+        "clause_id": "POL-3",
+        "document": "policy.md",
+        "quote": "POL-3: Do not split a purchase across invoices within 7 days to avoid POL-2.",
+        "version": "Synthetic spending policy v1"
+      },
+      "confidence": 1.0,
+      "evidence": [
+        {
+          "page": 1,
+          "text": "Test item 1 | 292 | 10.00 | 2920.00"
+        },
+        {
+          "page": 1,
+          "text": "Test item 1 | 256 | 10.00 | 2560.00"
+        }
+      ],
+      "invoice_numbers": [
+        "INV-2026-0054",
+        "INV-2026-0055"
+      ],
+      "no_clause_reason": null,
+      "status": "pending",
+      "type": "split_purchase"
+    },
+    {
+      "amount_at_issue": "676.00",
+      "calculation": "1876.00 - (400.00 \u00d7 3) = 676.00",
+      "citation": null,
+      "confidence": 0.7,
+      "evidence": [
+        {
+          "page": 1,
+          "text": "Test item 5 | 134 | 14.00 | 1876.00"
+        }
+      ],
+      "invoice_numbers": [
+        "INV-2026-0048"
+      ],
+      "no_clause_reason": "no applicable clause identified",
+      "status": "pending",
+      "type": "unusual_amount"
+    },
+    {
+      "amount_at_issue": "326.00",
+      "calculation": "1526.00 - (400.00 \u00d7 3) = 326.00",
+      "citation": null,
+      "confidence": 0.7,
+      "evidence": [
+        {
+          "page": 1,
+          "text": "Test item 5 | 109 | 14.00 | 1526.00"
+        }
+      ],
+      "invoice_numbers": [
+        "INV-2026-0056"
+      ],
+      "no_clause_reason": "no applicable clause identified",
+      "status": "pending",
+      "type": "unusual_amount"
+    },
+    {
+      "amount_at_issue": "182.00",
+      "calculation": "line 1 amount 182.00 under POL-4",
+      "citation": {
+        "clause_id": "POL-4",
+        "document": "policy.md",
+        "quote": "POL-4: Gift cards and other cash equivalents are prohibited.",
+        "version": "Synthetic spending policy v1"
+      },
+      "confidence": 1.0,
+      "evidence": [
+        {
+          "page": 1,
+          "text": "Prepaid Visa card | 14 | 13.00 | 182.00"
+        }
+      ],
+      "invoice_numbers": [
+        "INV-2026-0049"
+      ],
+      "no_clause_reason": null,
+      "status": "pending",
+      "type": "policy_violation"
+    },
+    {
+      "amount_at_issue": "78.00",
+      "calculation": "line 1 amount 78.00 under POL-4",
+      "citation": {
+        "clause_id": "POL-4",
+        "document": "policy.md",
+        "quote": "POL-4: Gift cards and other cash equivalents are prohibited.",
+        "version": "Synthetic spending policy v1"
+      },
+      "confidence": 1.0,
+      "evidence": [
+        {
+          "page": 1,
+          "text": "Holiday gift certificates | 6 | 13.00 | 78.00"
+        }
+      ],
+      "invoice_numbers": [
+        "INV-2026-0057"
+      ],
+      "no_clause_reason": null,
+      "status": "pending",
+      "type": "policy_violation"
+    }
+  ],
+  "investigation": {
+    "completed": 14,
+    "completion_rate": 1.0,
+    "groups": 14
+  },
+  "largest_run": {
+    "calls": 5,
+    "cost": "0.0294448",
+    "within_limits": true
+  },
+  "limit": null,
+  "metadata": {
+    "date": "2026-11-05T11:30:11.677708+00:00",
+    "git_revision": "aa70fd2",
+    "max_cost": "0.50",
+    "model_ids": {
+      "extract": "global.amazon.nova-2-lite-v1:0",
+      "investigate": "global.anthropic.claude-sonnet-4-6",
+      "policy": "global.amazon.nova-2-lite-v1:0"
+    },
+    "seed": 7
+  },
+  "mode": "live",
+  "note_grading": "Manual five-point checklist in investigator_eval.py; counts are not quality scores",
+  "notes": {
+    "INV-2026-0003": [
+      {
+        "finding_index": 0,
+        "related_invoices": [
+          "INV-2026-0003",
+          "INV-2026-0003-A"
+        ],
+        "summary": "The duplicate search confirms that INV-2026-0003-A exists with the same date (2026-01-03), PO number (PO-2026-0003), and total ($156.00) as INV-2026-0003. Both invoices appear together in the related-invoices window, strongly suggesting one is a duplicate submission. Vendor history shows consistent $2,000/month spend with no prior anomalies, providing no mitigating context.",
+        "uncertainty": "low"
+      }
+    ],
+    "INV-2026-0004": [
+      {
+        "finding_index": 0,
+        "related_invoices": [
+          "INV-2026-0004",
+          "INV-2026-0004-A"
+        ],
+        "summary": "The duplicate search confirms that INV-2026-0004 and INV-2026-0004-A share the same date (2026-01-04), PO number (PO-2026-0004), and total ($208.00). The related invoices lookup also returns both records on the same date under the same vendor. Vendor history shows consistent monthly spend of $2,000.00 with no prior anomalies, making a double-entry for the same PO notable. Evidence of duplication is strong.",
+        "uncertainty": "low"
+      }
+    ],
+    "INV-2026-0043": [
+      {
+        "finding_index": 0,
+        "related_invoices": [
+          "INV-2026-0043"
+        ],
+        "summary": "Finding alleges a $28.00 overcharge on INV-2026-0043 (clause CON-VEN-003-1): $14.00/unit billed vs. $12.00/unit contracted \u00d7 14 units. The $196.00 invoice total is consistent with the higher billed rate. No duplicate invoices found; vendor history shows steady $2,000/month in 2025, offering no contradiction. Certainty is medium \u2014 the math is consistent, but the contracted rate per CON-VEN-003-1 was not directly verified.",
+        "uncertainty": "medium"
+      }
+    ],
+    "INV-2026-0044": [
+      {
+        "finding_index": 0,
+        "related_invoices": [
+          "INV-2026-0044"
+        ],
+        "summary": "The stated invoice total of $202.00 does not reconcile with the sum of subtotal + tax ($195.00), producing a $7.00 discrepancy. No duplicate invoices were found, and the vendor's monthly history shows consistent $2,000.00 totals with no anomalies. This appears to be a straightforward arithmetic error on the invoice, though the root cause (data entry vs. intentional overcharge) is unconfirmed.",
+        "uncertainty": "medium"
+      }
+    ],
+    "INV-2026-0045": [
+      {
+        "finding_index": 0,
+        "related_invoices": [
+          "INV-2026-0045"
+        ],
+        "summary": "INV-2026-0045 totals $1,056.00, exceeding the $1,000 PO-required threshold (POL-1), and carries no PO number. No duplicate invoices were found. Vendor history shows consistent $2,000/month spend in 2025 with no prior invoices in the 31-day look-back window, so the amount is not anomalous in context. The policy violation itself is clear-cut and well-supported; the absence of a PO is confirmed.",
+        "uncertainty": "low"
+      }
+    ],
+    "INV-2026-0046": [
+      {
+        "finding_index": 0,
+        "related_invoices": [
+          "INV-2026-0046",
+          "INV-2026-0047"
+        ],
+        "summary": "INV-2026-0046 ($2,530, Jul 6) and INV-2026-0047 ($2,760, Jul 8) combine to $5,290, breaching the $5,000 threshold (POL-3) within 2 days. Each has a distinct PO, which may indicate legitimate separate orders. However, this vendor's monthly spend has been a steady $2,000 for all of 2025, making the combined $5,290 a significant departure. Uncertainty is medium.",
+        "uncertainty": "medium"
+      }
+    ],
+    "INV-2026-0048": [
+      {
+        "finding_index": 0,
+        "related_invoices": [
+          "INV-2026-0048"
+        ],
+        "summary": "Vendor history shows 12 consecutive months (Jan\u2013Dec 2025) of exactly $400.00/month, making $400.00 the clear baseline unit rate. INV-2026-0048 totals $1,876.00, which equals 3 \u00d7 $400.00 plus a $676.00 remainder that does not align with any whole-unit multiple. No duplicate invoices were found, and no other invoices appeared in the 31-day window. The $676.00 unexplained residual warrants clarification, but an unusual amount alone is not conclusive. Uncertainty is medium.",
+        "uncertainty": "medium"
+      }
+    ],
+    "INV-2026-0049": [
+      {
+        "finding_index": 0,
+        "related_invoices": [
+          "INV-2026-0049"
+        ],
+        "summary": "INV-2026-0049 for $182.00 was flagged under POL-4. No duplicate invoices were found. The vendor's monthly spend has been a consistent $2,000.00 for all 12 months of 2025, making this $182.00 invoice notably lower and atypical in amount. The related invoices search returned only this single invoice in the past 31 days, providing no additional corroborating context. The policy violation stands on its own merits; certainty is medium pending POL-4 clause details.",
+        "uncertainty": "medium"
+      }
+    ],
+    "INV-2026-0051": [
+      {
+        "finding_index": 0,
+        "related_invoices": [
+          "INV-2026-0051"
+        ],
+        "summary": "The finding alleges a contract overcharge of $26.00 on INV-2026-0051, calculated as a unit price of $14.00 vs. the contracted $12.00 across 13 units (per clause CON-VEN-003-1). Vendor history shows consistent monthly totals of $2,000.00 through 2025, making this $182.00 invoice a notable departure, though no duplicate invoices were found. The overcharge calculation is internally consistent, but the contracted rate could not be independently verified here, leaving medium uncertainty.",
+        "uncertainty": "medium"
+      }
+    ],
+    "INV-2026-0052": [
+      {
+        "finding_index": 0,
+        "related_invoices": [
+          "INV-2026-0052"
+        ],
+        "summary": "The invoice states a total of $98.00, but the subtotal plus tax sums to $91.00 \u2014 a $7.00 discrepancy. No duplicate invoices were found, and the vendor's monthly history (consistently $2,000/month in 2025) provides no comparable line-item data to corroborate either figure. The arithmetic error is clearly documented; the cause (intentional or clerical) is uncertain.",
+        "uncertainty": "medium"
+      }
+    ],
+    "INV-2026-0053": [
+      {
+        "finding_index": 0,
+        "related_invoices": [
+          "INV-2026-0053"
+        ],
+        "summary": "INV-2026-0053 totals $1,188.00, exceeding the $1,000 PO-required threshold (POL-1), and carries no PO number. No duplicate invoices were found. Vendor history shows consistent $2,000/month spend in 2025 but no 2026 records, so this invoice's amount is not anomalous relative to prior activity. The policy violation itself is clear-cut; uncertainty is low.",
+        "uncertainty": "low"
+      }
+    ],
+    "INV-2026-0054": [
+      {
+        "finding_index": 0,
+        "related_invoices": [
+          "INV-2026-0054",
+          "INV-2026-0055"
+        ],
+        "summary": "INV-2026-0054 ($2,920, Aug 25) and INV-2026-0055 ($2,560, Aug 27) are 2 days apart, each below the $5,000 threshold but totaling $5,480 (POL-3). Each has a distinct PO number, which could indicate independent orders. Vendor history shows a steady $2,000/month in 2025, making this spike notable. No duplicates found. Uncertainty is medium.",
+        "uncertainty": "medium"
+      }
+    ],
+    "INV-2026-0056": [
+      {
+        "finding_index": 0,
+        "related_invoices": [
+          "INV-2026-0056"
+        ],
+        "summary": "Vendor history shows 12 consecutive months (Jan\u2013Dec 2025) of exactly $400.00/month. INV-2026-0056 totals $1,526.00 \u2014 equivalent to 3 \u00d7 $400.00 plus an unexplained $326.00 remainder. No duplicate invoices were found, and no other invoices appeared in the surrounding 31-day window. The $326.00 overage relative to the established $400 baseline warrants clarification, though an approved rate change or bundled billing could explain it. Uncertainty is medium.",
+        "uncertainty": "medium"
+      }
+    ],
+    "INV-2026-0057": [
+      {
+        "finding_index": 0,
+        "related_invoices": [
+          "INV-2026-0057"
+        ],
+        "summary": "INV-2026-0057 totals $78.00, flagged as a POL-4 policy violation. Vendor history shows consistent monthly spend of $2,000.00 throughout 2025, making this $78.00 invoice notably lower than the historical pattern. No duplicate invoices were found, and no other invoices appeared in the surrounding 31-day window. The policy violation flag appears supported by the amount, though the low total and absence of duplicates reduce other risk indicators. Uncertainty is medium pending clarification of POL-4's specific threshold or requirement.",
+        "uncertainty": "medium"
+      }
+    ]
+  },
+  "pipeline_run_id": "825e9c3a6bba4448a0d0d8306e960e2a",
+  "referrals": {
+    "by_stage": {
+      "budget": 0,
+      "extraction": 0,
+      "investigation": 0,
+      "policy": 0,
+      "rules": 0
+    },
+    "count": 0,
+    "items": []
+  },
+  "scoring_identity": "PDF filename; extracted invoice numbers remain unchanged in pipeline results",
+  "scoring_scope": "All selected documents; only complete selected answer groups",
+  "selected_documents": [
+    "INV-2026-0003",
+    "INV-2026-0003-A",
+    "INV-2026-0004",
+    "INV-2026-0004-A",
+    "INV-2026-0005",
+    "INV-2026-0043",
+    "INV-2026-0044",
+    "INV-2026-0045",
+    "INV-2026-0046",
+    "INV-2026-0047",
+    "INV-2026-0048",
+    "INV-2026-0049",
+    "INV-2026-0051",
+    "INV-2026-0052",
+    "INV-2026-0053",
+    "INV-2026-0054",
+    "INV-2026-0055",
+    "INV-2026-0056",
+    "INV-2026-0057"
+  ],
+  "skipped_stages": [],
+  "split": "test",
+  "stages": {
+    "extraction": {
+      "calls": 19,
+      "cost": "0.0206296",
+      "seconds": 58.416351072,
+      "tokens": {
+        "input": 33782,
+        "output": 4198
+      },
+      "unpriced_calls": 0
+    },
+    "investigation": {
+      "calls": 31,
+      "cost": "0.262764",
+      "seconds": 64.59846554400156,
+      "tokens": {
+        "input": 57393,
+        "output": 6039
+      },
+      "unpriced_calls": 0
+    },
+    "policy": {
+      "calls": 19,
+      "cost": "0.0081839",
+      "seconds": 12.15913827300119,
+      "tokens": {
+        "input": 22463,
+        "output": 578
+      },
+      "unpriced_calls": 0
+    }
+  },
+  "stopped": null,
+  "timing": {
+    "basis": "Pipeline wall time; per-stage seconds measure provider calls only",
+    "per_invoice_seconds": 7.131510673736844,
+    "total_seconds": 135.49870280100004
+  }
+}
