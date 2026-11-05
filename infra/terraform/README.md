@@ -146,11 +146,9 @@ needed. The bootstrap state bucket is protected from destruction and may retain
 versioned state; do not remove it while any stack still uses it. Removing that
 protection and deleting versions/bucket requires a separate approved teardown.
 
-## Step 8c: S3 pipeline runner (built; deployed smoke not verified)
+## Step 8c: S3 pipeline runner (deployed and verified at 6775e4a)
 
-The uploader and separate asynchronous Lambda are built and covered by offline
-and local Postgres tests. They are not verified against a deployed S3-to-Lambda-to-
-Neon run until an explicitly authorized live smoke run succeeds. No code or test
+The uploader and separate asynchronous Lambda are covered by offline and local Postgres tests, and a live S3-to-Lambda-to-Neon smoke run and full `dev` batch succeeded at revision `6775e4a`. The deployed code is now `aa70fd2`, which has not processed a batch. No code or test
 uploads a real batch or invokes Bedrock automatically. Applying infrastructure,
 uploading a trigger manifest, and the live smoke run require specific approval.
 The API role retains no Bedrock permission and the web Lambda is unchanged.

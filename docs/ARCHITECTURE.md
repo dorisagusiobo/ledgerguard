@@ -1,16 +1,18 @@
 # LedgerGuard architecture
 
-This document describes the planned Version 1. Built so far: the synthetic data and PDF
+This document describes Version 1. Built so far: the synthetic data and PDF
 generator, extractor, rule checks, policy checker, bounded investigator and read-only
 tools, scorer, per-step and pipeline evaluations, and governance gateway. Postgres
 persistence, an independent audit sink, a persistent monthly ledger and investigator
 checkpoints are implemented, along with the five-route review API and a local Next.js
 review screen. Cognito web sign-in, standalone Lambda packaging, deployment
-Terraform and replay persistence are implemented locally. Deployment and the
-signed-in end-to-end review are not verified yet. pgvector clause retrieval is
-deferred (see step 3). Step 8c is built: a dev-only S3 uploader and a separate
-asynchronous Lambda run the governed pipeline and persist live results to Neon.
-The deployed 8c smoke run is not verified yet.
+Terraform and replay persistence are implemented. Signed-in review on the deployed
+site was verified on 2026-11-04 and 2026-11-05, with decisions saved under the
+reviewer's verified email. pgvector clause retrieval is deferred (see step 3).
+Step 8c is built: a dev-only S3 uploader and a separate asynchronous Lambda run
+the governed pipeline and persist live results to Neon. Deployed dev smoke and
+full-batch results are described below; both ran at revision `6775e4a`. The
+deployed code is now `aa70fd2`, which has not processed a batch.
 
 ## 1. Problem
 
@@ -21,7 +23,7 @@ every finding with a dollar amount, source evidence and the exact policy or cont
 clause. A person reviews every finding; LedgerGuard never pays or changes financial
 records on its own.
 
-## Step 8c: asynchronous synthetic batches (built, not smoke-verified)
+## Step 8c: asynchronous synthetic batches (deployed and verified at `6775e4a`)
 
 A synthetic dev batch reaches the pipeline through a separate private S3 bucket.
 The uploader sends only dev PDFs and three allowlisted reference files, with a
@@ -46,8 +48,14 @@ IDs, counts, costs, status and stop reason. Failures record only an exception
 class and are rethrown without the original message. Logs exclude document text,
 model output and credentials. Bucket contents expire after 14 days. See
 [the deployment guide](../infra/terraform/README.md) for paths, commands and IAM
-boundaries. End-to-end deployment is unverified until an approved smoke run
-uploads a synthetic manifest and its persisted run appears on the review site.
+boundaries. A deployed 3-invoice `dev` smoke run cost $0.0209925; a reviewer
+decision on it was saved, and a re-sent event was refused with no spend. A deployed
+38-invoice `dev` batch caught 14/14 expected findings with no extras, cost
+$0.2884795, and produced one referral. Both batches ran at revision `6775e4a`.
+Signed-in review was verified on 2026-11-04 and 2026-11-05, with decisions saved
+under the reviewer's verified email. The deployed code is now `aa70fd2`, which has
+not processed a batch. The held-out run itself was local and does not verify
+deployment.
 
 ## 2. User
 
@@ -175,7 +183,7 @@ from what the model sees.
 | Cost and time per invoice | Whether it is practical to run |
 
 Targets: at least 90% precision and 90% recall on held-out invoices, and every governance
-test passing. These are goals, not results.
+test passing. The held-out measurements below are assessed against these goals.
 
 **Development results so far (`dev` split, seed 7; not held-out results).** Each step was
 evaluated on its own:
@@ -193,6 +201,33 @@ did not flag it. The label was kept as planted rather than changed after seeing 
 Investigator notes are graded by hand against a checklist; there is no automatic quality
 score. CI runs the tests and a small evaluation with
 recorded model responses; live-model evaluations run before releases within a set budget.
+
+**Held-out pipeline result (`test` split, seed 7, 2026-11-05, revision `aa70fd2`).**
+The saved live report covers all 19 test PDFs; these are historical measurements,
+not a new evaluation of later code changes.
+
+| Measure | Held-out result |
+| --- | --- |
+| Detection | 14/14 planted problems, 100% precision and recall (rules-only baseline: 12/14) |
+| Amount and citation accuracy | 100% each, against planted answers |
+| Exact extraction | 19/19 PDFs |
+| Clean invoices wrongly flagged | 0/1 |
+| Investigator completion / referrals | 14/14 / 0 |
+| Cost / wall time | $0.2915775 total, approximately $0.01535 per invoice / 135.5 seconds |
+| Strict five-point manual note grading | 3/14 all-five passes; all 14 avoid fraud accusations |
+
+All governance tests passed in CI at `aa70fd2`.
+
+Detection meets the targets on this small synthetic split; note completion does
+not establish note quality. The notes still need revision for unsupported monthly
+history inferences, certainty about cause rather than finding support, semantic
+policy evidence and verbosity. The earlier investigator-only dev report grades
+Nova at 4/12 and Sonnet at 2/10 available notes (10/12 completed); it is distinct
+from the separate 12/12 Sonnet dev run above. Only one clean test invoice and one
+seed limit generalization. See [the evaluation write-up](EVALUATION.md),
+[per-note grades](../evals/results/pipeline-test-final-grading.md) and
+[preserved report/audit evidence](../evals/results/README.md). These editorial
+grades are separate from automated detection scores and independent human review.
 
 ## 8. Decision log
 

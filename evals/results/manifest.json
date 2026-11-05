@@ -1,0 +1,24 @@
+{
+  "artifacts": [
+    {
+      "path": "pipeline-test-final.json",
+      "bytes": 26257,
+      "sha256": "ba4eb6de438092f67b14c28c0003798adad63eb0e00df624aaa089b0645a3789"
+    },
+    {
+      "path": "pipeline-test-final-audit.jsonl",
+      "bytes": 44564,
+      "sha256": "c8f984458f2a9ddae0775eaa0470c83b15901d38853220857bf396294c153cb8"
+    },
+    {
+      "path": "investigator-dev-full.json",
+      "bytes": 20744,
+      "sha256": "de4be60eebe95712ff14a1f058badff81c9c6aedb9361379798ea2482c054141"
+    },
+    {
+      "path": "investigator-dev-full-audit.jsonl",
+      "bytes": 77356,
+      "sha256": "ddd5c859ff55bee06e62cc586e3069be044f148ae1efd2fcde346dbf48b62307"
+    }
+  ]
+}

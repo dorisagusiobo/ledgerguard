@@ -1,0 +1,491 @@
+{
+  "batch": {
+    "calls": 95,
+    "cost": "0.2540950",
+    "max_calls": 144,
+    "max_cost": "0.80",
+    "max_tool_calls": 240,
+    "tool_calls": 95
+  },
+  "limit": null,
+  "metadata": {
+    "date": "2026-10-31T10:00:31.823247+00:00",
+    "git_revision": "40ffb3a",
+    "max_cost": "0.80",
+    "max_turns": 6,
+    "model_ids": {
+      "nova": "global.amazon.nova-2-lite-v1:0",
+      "sonnet": "global.anthropic.claude-sonnet-4-6"
+    },
+    "seed": 7
+  },
+  "models": {
+    "nova": {
+      "attempted": 12,
+      "completed": 12,
+      "completion_rate": 1.0,
+      "cost": {
+        "per_investigation": "0.004428333333333333333333333333",
+        "total": "0.0531400"
+      },
+      "executed_tool_calls": {
+        "max": 5,
+        "median": 5.0
+      },
+      "expected_tool_used": {
+        "duplicate": {
+          "expected": 2,
+          "rate": 1.0,
+          "used": 2
+        },
+        "split_purchase": {
+          "expected": 2,
+          "rate": 1.0,
+          "used": 2
+        },
+        "unusual_amount": {
+          "expected": 2,
+          "rate": 1.0,
+          "used": 2
+        }
+      },
+      "findings_unchanged": {
+        "changed_groups": [],
+        "checked": 12,
+        "rate": 1.0,
+        "unchanged": 12
+      },
+      "fraud_mentions": {
+        "count": 1,
+        "invoice_numbers": [
+          "INV-2026-0037"
+        ]
+      },
+      "investigation_timing": {
+        "max": 5.955828901000132,
+        "median": 3.9998449825002353
+      },
+      "model_id": "global.amazon.nova-2-lite-v1:0",
+      "not_attempted": [],
+      "notes": [
+        {
+          "finding_index": 0,
+          "finding_type": "duplicate",
+          "invoice_number": "INV-2026-0001",
+          "related_invoices": [
+            "INV-2026-0001",
+            "INV-2026-0001-A"
+          ],
+          "summary": "Invoice INV-2026-0001 is a duplicate of INV-2026-0001-A, both with the same total of $180.00 and PO number PO-2026-0001, dated 2026-01-01. The duplicate invoice pattern is clear and consistent with the provided data.",
+          "uncertainty": "low"
+        },
+        {
+          "finding_index": 0,
+          "finding_type": "duplicate",
+          "invoice_number": "INV-2026-0002",
+          "related_invoices": [
+            "INV-2026-0002",
+            "INV-2026-0002-A"
+          ],
+          "summary": "Invoice INV-2026-0002 has a duplicate invoice INV-2026-0002-A with the same total amount of $66.00 and the same PO number PO-2026-0002, dated the same day. This suggests a possible duplication error.",
+          "uncertainty": "low"
+        },
+        {
+          "finding_index": 0,
+          "finding_type": "contract_overcharge",
+          "invoice_number": "INV-2026-0027",
+          "related_invoices": [
+            "INV-2026-0027"
+          ],
+          "summary": "The finding indicates a contract overcharge of $34.00 on invoice INV-2026-0027 from Synthetic Packaging Co., calculated as (14.00 - 12.00) \u00d7 17. The vendor\u2019s spending history shows consistent monthly totals of $2,000.00, with no unusual spikes. No duplicate invoices or related invoices were found for the same period, supporting the uniqueness of this invoice. However, without seeing the contract terms or additional context on the calculation, certainty is limited.",
+          "uncertainty": "medium"
+        },
+        {
+          "finding_index": 0,
+          "finding_type": "arithmetic_error",
+          "invoice_number": "INV-2026-0028",
+          "related_invoices": [
+            "INV-2026-0028"
+          ],
+          "summary": "The invoice shows a total of $137.00, but the subtotal plus tax calculation indicates the correct total should be $130.00, creating a $7.00 discrepancy. There is only one invoice from this vendor in the review window, and no duplicate invoices were found, suggesting this is an isolated arithmetic error rather than a pattern of misreporting.",
+          "uncertainty": "low"
+        },
+        {
+          "finding_index": 0,
+          "finding_type": "policy_violation",
+          "invoice_number": "INV-2026-0029",
+          "related_invoices": [
+            "INV-2026-0029"
+          ],
+          "summary": "Invoice exceeds $1000 without a PO number, which violates policy POL-1. The vendor's monthly spending history shows consistent amounts of $2000, suggesting this invoice may be part of a pattern, but no duplicates or additional context were found.",
+          "uncertainty": "low"
+        },
+        {
+          "finding_index": 0,
+          "finding_type": "split_purchase",
+          "invoice_number": "INV-2026-0030",
+          "related_invoices": [
+            "INV-2026-0030",
+            "INV-2026-0031"
+          ],
+          "summary": "The two invoices INV-2026-0030 and INV-2026-0031 totaling $5280.00 were issued within 7 days, exceeding the $5000 threshold for a split purchase.",
+          "uncertainty": "low"
+        },
+        {
+          "finding_index": 0,
+          "finding_type": "unusual_amount",
+          "invoice_number": "INV-2026-0032",
+          "related_invoices": [
+            "INV-2026-0032"
+          ],
+          "summary": "The invoice amount of $1638.00 deviates from the consistent monthly payments of $400.00 to Synthetic Training Co. The calculation shows an additional $438.00 beyond the expected three payments of $400.00. No duplicate invoices or similar amounts were found in the vendor history or related invoices, suggesting this may be an error in invoicing or payment processing.",
+          "uncertainty": "medium"
+        },
+        {
+          "finding_index": 0,
+          "finding_type": "contract_overcharge",
+          "invoice_number": "INV-2026-0035",
+          "related_invoices": [
+            "INV-2026-0035"
+          ],
+          "summary": "The invoice shows a contract overcharge of $60.00 based on a discrepancy between contracted and invoiced unit prices. The vendor\u2019s historical spending shows consistent monthly totals, and no duplicate invoices or related invoices were found, supporting the validity of the overcharge calculation.",
+          "uncertainty": "low"
+        },
+        {
+          "finding_index": 0,
+          "finding_type": "arithmetic_error",
+          "invoice_number": "INV-2026-0036",
+          "related_invoices": [
+            "INV-2026-0036"
+          ],
+          "summary": "The invoice shows a total of $176.00, but the subtotal plus tax calculation indicates the correct total should be $169.00, creating a $7.00 discrepancy. There is one related invoice with the same details, and no duplicates were found, suggesting this may be an isolated arithmetic error.",
+          "uncertainty": "low"
+        },
+        {
+          "finding_index": 0,
+          "finding_type": "policy_violation",
+          "invoice_number": "INV-2026-0037",
+          "related_invoices": [
+            "INV-2026-0037"
+          ],
+          "summary": "The invoice exceeds $1000 and lacks a purchase order number, which is a policy violation. The vendor's monthly spending history shows consistent amounts of $2000, but this single invoice does not align with that pattern, suggesting potential misclassification or error rather than fraud.",
+          "uncertainty": "medium"
+        },
+        {
+          "finding_index": 0,
+          "finding_type": "split_purchase",
+          "invoice_number": "INV-2026-0038",
+          "related_invoices": [
+            "INV-2026-0038",
+            "INV-2026-0039"
+          ],
+          "summary": "The two invoices INV-2026-0038 and INV-2026-0039 from Synthetic Office Supply Co. total $5,670 and were issued within 7 days of each other. This exceeds the $5,000 threshold for split purchases, indicating potential manipulation of transaction sizes to avoid detection.",
+          "uncertainty": "low"
+        },
+        {
+          "finding_index": 0,
+          "finding_type": "unusual_amount",
+          "invoice_number": "INV-2026-0040",
+          "related_invoices": [
+            "INV-2026-0040"
+          ],
+          "summary": "The invoice total of 1778.00 includes an unusual amount of 578.00, calculated as 1778.00 minus three payments of 400.00 each, which matches the vendor\u2019s historical monthly spending pattern. No duplicate invoices or related invoices were found, and the PO number matches. The unusual amount is likely due to a one-time adjustment or additional charge.",
+          "uncertainty": "low"
+        }
+      ],
+      "referrals": {
+        "by_reason": {},
+        "count": 0,
+        "invoices": []
+      },
+      "timing": {
+        "calls": 71,
+        "median_seconds": 0.6018113760001143,
+        "slowest_seconds": 1.6157556449998083
+      },
+      "tokens": {
+        "input": 144350,
+        "output": 3934
+      },
+      "tool_calls": {
+        "max": 5,
+        "median": 5.0
+      },
+      "tools_executed": {
+        "duplicate_search": 14,
+        "related_invoices": 21,
+        "vendor_history": 23
+      },
+      "turns": {
+        "max": 6,
+        "median": 6.0
+      },
+      "uncertainty": {
+        "arithmetic_error": {
+          "high": 0,
+          "low": 2,
+          "medium": 0
+        },
+        "contract_overcharge": {
+          "high": 0,
+          "low": 1,
+          "medium": 1
+        },
+        "duplicate": {
+          "high": 0,
+          "low": 2,
+          "medium": 0
+        },
+        "policy_violation": {
+          "high": 0,
+          "low": 1,
+          "medium": 1
+        },
+        "split_purchase": {
+          "high": 0,
+          "low": 2,
+          "medium": 0
+        },
+        "unusual_amount": {
+          "high": 0,
+          "low": 1,
+          "medium": 1
+        }
+      }
+    },
+    "sonnet": {
+      "attempted": 12,
+      "completed": 10,
+      "completion_rate": 0.8333333333333334,
+      "cost": {
+        "per_investigation": "0.01674625",
+        "total": "0.200955"
+      },
+      "executed_tool_calls": {
+        "max": 3,
+        "median": 3.0
+      },
+      "expected_tool_used": {
+        "duplicate": {
+          "expected": 2,
+          "rate": 1.0,
+          "used": 2
+        },
+        "split_purchase": {
+          "expected": 2,
+          "rate": 1.0,
+          "used": 2
+        },
+        "unusual_amount": {
+          "expected": 2,
+          "rate": 1.0,
+          "used": 2
+        }
+      },
+      "findings_unchanged": {
+        "changed_groups": [],
+        "checked": 12,
+        "rate": 1.0,
+        "unchanged": 12
+      },
+      "fraud_mentions": {
+        "count": 0,
+        "invoice_numbers": []
+      },
+      "investigation_timing": {
+        "max": 4.646829463000358,
+        "median": 4.247267558499971
+      },
+      "model_id": "global.anthropic.claude-sonnet-4-6",
+      "not_attempted": [],
+      "notes": [
+        {
+          "finding_index": 0,
+          "finding_type": "duplicate",
+          "invoice_number": "INV-2026-0001",
+          "related_invoices": [
+            "INV-2026-0001",
+            "INV-2026-0001-A"
+          ],
+          "summary": "A duplicate search for INV-2026-0001 returned INV-2026-0001-A, which shares the same vendor (Synthetic Office Supply Co.), invoice date (2026-01-01), PO number (PO-2026-0001), and total ($180.00). This strongly suggests the same charge was submitted twice under two slightly different invoice numbers. Vendor monthly history shows a consistent $2,000/month spend, so the $180.00 amount is not unusual on its own, but the matching attributes across both invoices support a high-confidence duplicate concern.",
+          "uncertainty": "low"
+        },
+        {
+          "finding_index": 0,
+          "finding_type": "duplicate",
+          "invoice_number": "INV-2026-0002",
+          "related_invoices": [
+            "INV-2026-0002",
+            "INV-2026-0002-A"
+          ],
+          "summary": "The duplicate search confirms that INV-2026-0002-A exists with the same vendor (Synthetic Workshop Co.), same date (2026-01-02), same PO number (PO-2026-0002), and identical total of $66.00 as INV-2026-0002. Both invoices also appear together in the related-invoices window, reinforcing that they share all key attributes. This is a strong match for a duplicate submission, though it is possible INV-2026-0002-A is a legitimate amended or corrected invoice intentionally issued alongside the original.",
+          "uncertainty": "low"
+        },
+        {
+          "finding_index": 0,
+          "finding_type": "contract_overcharge",
+          "invoice_number": "INV-2026-0027",
+          "related_invoices": [
+            "INV-2026-0027"
+          ],
+          "summary": "The finding identifies a contract overcharge of $34.00 on INV-2026-0027 under clause CON-VEN-003-1, calculated as a $2.00/unit price excess across 17 units ($14.00 billed vs. $12.00 contracted rate). The invoice total of $238.00 is consistent with the higher per-unit price. No duplicate invoices were found, and the vendor's monthly history shows consistent $2,000.00 totals through 2025, making this invoice an outlier worth scrutiny. The overcharge calculation is internally consistent, but confirmation depends on the contracted rate in CON-VEN-003-1.",
+          "uncertainty": "medium"
+        },
+        {
+          "finding_index": 0,
+          "finding_type": "arithmetic_error",
+          "invoice_number": "INV-2026-0028",
+          "related_invoices": [
+            "INV-2026-0028"
+          ],
+          "summary": "INV-2026-0028 states a total of $137.00, but the sum of subtotal ($130.00) and tax yields $130.00, a $7.00 discrepancy. No duplicate invoices were found, and the vendor's monthly history shows consistent $2,000.00 totals through 2025 with no comparable anomalies. The arithmetic gap is clearly documented; whether it is a keying error or intentional overcharge is uncertain.",
+          "uncertainty": "medium"
+        },
+        {
+          "finding_index": 0,
+          "finding_type": "policy_violation",
+          "invoice_number": "INV-2026-0029",
+          "related_invoices": [
+            "INV-2026-0029"
+          ],
+          "summary": "INV-2026-0029 totals $1,232.00, which exceeds the $1,000 policy threshold requiring a PO number, yet no PO number is present on the invoice. No duplicate invoices were found, and the related-invoices search shows no other recent invoices from this vendor in the prior 31 days that might suggest splitting. Vendor history shows consistent $2,000/month spend throughout 2025, so the amount itself is not unusual, but the missing PO is a clear policy violation per POL-1. Certainty is low that this is anything beyond an administrative oversight.",
+          "uncertainty": "low"
+        },
+        {
+          "finding_index": 0,
+          "finding_type": "unusual_amount",
+          "invoice_number": "INV-2026-0032",
+          "related_invoices": [
+            "INV-2026-0032"
+          ],
+          "summary": "INV-2026-0032 totals $1,638.00, which is $438.00 above a clean multiple of $400.00 (3 \u00d7 $400). Vendor history shows 12 consecutive months (Jan\u2013Dec 2025) of exactly $400.00/month with no variation, and the related-invoices search found no other invoices in the prior 31 days to explain the extra $438.00. No duplicate invoices were found. The $438.00 overage is unexplained by available data, but the cause (e.g., a legitimate one-time add-on, rate change, or billing error) is uncertain.",
+          "uncertainty": "medium"
+        },
+        {
+          "finding_index": 0,
+          "finding_type": "contract_overcharge",
+          "invoice_number": "INV-2026-0035",
+          "related_invoices": [
+            "INV-2026-0035"
+          ],
+          "summary": "INV-2026-0035 totals $420.00, but per contract clause CON-VEN-003-1 the contracted unit price is $12.00; the invoice appears to apply $14.00 per unit across 30 units, yielding a $2.00/unit overcharge and a calculated total overcharge of $60.00 (expected total: $360.00). Vendor history shows consistent monthly spend of $2,000.00 through 2025 with no prior anomalies, and no duplicate invoices were found. The overcharge is supported by the contract clause and the arithmetic, though the specific line-item unit price on the invoice is redacted, leaving moderate uncertainty.",
+          "uncertainty": "medium"
+        },
+        {
+          "finding_index": 0,
+          "finding_type": "arithmetic_error",
+          "invoice_number": "INV-2026-0036",
+          "related_invoices": [
+            "INV-2026-0036"
+          ],
+          "summary": "The stated invoice total of $176.00 does not reconcile with the sum of subtotal + tax, which yields $169.00 \u2014 a $7.00 discrepancy. No duplicate invoices were found, and the vendor's monthly history shows consistent $2,000 totals through 2025 with no prior arithmetic anomalies. The related April 2026 invoice (INV-2026-0033) shows no similar issue. The overcharge of $7.00 appears to be a clear arithmetic error, though it cannot be confirmed without the original line-item breakdown.",
+          "uncertainty": "low"
+        },
+        {
+          "finding_index": 0,
+          "finding_type": "policy_violation",
+          "invoice_number": "INV-2026-0037",
+          "related_invoices": [
+            "INV-2026-0037"
+          ],
+          "summary": "INV-2026-0037 totals $1,122.00, exceeding the $1,000 PO-required threshold under POL-1, and carries no PO number. No duplicate invoices were found, and the related-invoices search shows this is the only invoice from Synthetic Workshop Co. in the past 31 days. Vendor history shows consistent $2,000/month spend throughout 2025, suggesting prior invoices were either below the threshold or handled differently; the missing PO here is a clear policy gap but there is no additional pattern suggesting intentional circumvention. Certainty of the policy violation is high; intent is unknown.",
+          "uncertainty": "low"
+        },
+        {
+          "finding_index": 0,
+          "finding_type": "unusual_amount",
+          "invoice_number": "INV-2026-0040",
+          "related_invoices": [
+            "INV-2026-0040"
+          ],
+          "summary": "Vendor history shows a perfectly consistent monthly spend of $400.00 across all 12 months of 2025, suggesting a flat-rate or subscription arrangement. INV-2026-0040 totals $1,778.00 \u2014 equivalent to 3 months at $400.00 plus an unexplained $578.00 remainder. No duplicate invoices were found, and no other invoices appeared in the surrounding 31-day window. The $578.00 overage relative to the established $400.00 baseline warrants clarification, though an unusual amount alone is not conclusive. Uncertainty is medium.",
+          "uncertainty": "medium"
+        }
+      ],
+      "referrals": {
+        "by_reason": {
+          "investigation invalid: notes schema": 2
+        },
+        "count": 2,
+        "invoices": [
+          {
+            "detail": "investigation invalid: notes schema at loc [[\"notes\", 0, \"summary\"]]",
+            "invoice_number": "INV-2026-0030",
+            "reason": "investigation invalid: notes schema"
+          },
+          {
+            "detail": "investigation invalid: notes schema at loc [[\"notes\", 0, \"summary\"]]",
+            "invoice_number": "INV-2026-0038",
+            "reason": "investigation invalid: notes schema"
+          }
+        ]
+      },
+      "timing": {
+        "calls": 24,
+        "median_seconds": 1.8980855764993976,
+        "slowest_seconds": 3.2394862099999955
+      },
+      "tokens": {
+        "input": 42400,
+        "output": 4917
+      },
+      "tool_calls": {
+        "max": 3,
+        "median": 3.0
+      },
+      "tools_executed": {
+        "duplicate_search": 12,
+        "related_invoices": 11,
+        "vendor_history": 12
+      },
+      "turns": {
+        "max": 2,
+        "median": 2.0
+      },
+      "uncertainty": {
+        "arithmetic_error": {
+          "high": 0,
+          "low": 1,
+          "medium": 1
+        },
+        "contract_overcharge": {
+          "high": 0,
+          "low": 0,
+          "medium": 2
+        },
+        "duplicate": {
+          "high": 0,
+          "low": 2,
+          "medium": 0
+        },
+        "policy_violation": {
+          "high": 0,
+          "low": 2,
+          "medium": 0
+        },
+        "unusual_amount": {
+          "high": 0,
+          "low": 0,
+          "medium": 2
+        }
+      }
+    }
+  },
+  "note_grading": "Manual checklist in investigator_eval.py; no automatic quality score",
+  "selected_groups": [
+    "INV-2026-0001",
+    "INV-2026-0002",
+    "INV-2026-0027",
+    "INV-2026-0028",
+    "INV-2026-0029",
+    "INV-2026-0030",
+    "INV-2026-0032",
+    "INV-2026-0035",
+    "INV-2026-0036",
+    "INV-2026-0037",
+    "INV-2026-0038",
+    "INV-2026-0040"
+  ],
+  "split": "dev",
+  "stopped": null
+}
