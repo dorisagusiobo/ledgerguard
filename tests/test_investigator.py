@@ -123,9 +123,10 @@ def test_real_but_unseen_invoice_is_rejected(context, tmp_path):
                                    [note(summary='x' * 601)], [note(summary='   ')],
                                    [note(uncertainty='certain')], [note(extra='PRIVATE')]])
 def test_invalid_notes_become_safe_referral(context, tmp_path, notes):
-    client, gateway = setup(tmp_path, [submit(notes)])
+    client, gateway = setup(tmp_path, [submit(notes), submit(notes)])
     assert_review(run(context, gateway))
-    assert len(client.calls) == 1
+    expected_calls = 1 if not notes or len(notes) != 1 or notes[0]['finding_index'] != 0 else 2
+    assert len(client.calls) == expected_calls
 
 
 def test_repeated_index_with_correct_count_is_rejected(context, tmp_path):
@@ -280,7 +281,7 @@ def test_looping_model_can_finish_when_last_turn_is_forced(context, tmp_path):
 
 def test_notes_schema_referral_has_locations_not_values(context, tmp_path):
     secret = 'PRIVATE-SUMMARY-' * 60
-    client, gateway = setup(tmp_path, [submit([note(summary=secret)])])
+    client, gateway = setup(tmp_path, [submit([note(summary=secret)]), submit([note(summary=secret)])])
     result = run(context, gateway)
     assert_review(result)
     assert result.needs_review.reason == 'investigation invalid: notes schema at loc [["notes", 0, "summary"]]'
@@ -302,7 +303,7 @@ def test_unknown_related_invoice_has_specific_reason(context, tmp_path):
 def test_schema_referral_redacts_arbitrary_extra_field_names(context, tmp_path):
     data = note()
     data['PRIVATE-MODEL-KEY'] = 'PRIVATE-MODEL-VALUE'
-    client, gateway = setup(tmp_path, [submit([data])])
+    client, gateway = setup(tmp_path, [submit([data]), submit([data])])
     result = run(context, gateway)
     assert_review(result)
     assert '<unknown_field>' in result.needs_review.reason
@@ -322,3 +323,74 @@ def test_submit_notes_request_describes_summary_length(context, tmp_path):
     assert uncertainty['description'] == (
         'low = the evidence clearly supports the finding; high = the evidence is weak or conflicting.'
     )
+
+
+def test_repair_valid_notes_keeps_findings_unchanged(context, tmp_path):
+    before = deepcopy(context[2])
+    client, gateway = setup(tmp_path, [submit([note(summary='x' * 601)]), submit()])
+    result = run(context, gateway)
+    assert result.notes == [Note.model_validate(note())] and result.needs_review is None
+    assert len(client.calls) == 2
+    assert context[2] == before
+
+
+def test_repair_only_once(context, tmp_path):
+    invalid = submit([note(summary='x' * 601)])
+    client, gateway = setup(tmp_path, [invalid, invalid, submit()])
+    result = run(context, gateway)
+    assert_review(result)
+    assert result.needs_review.reason == 'investigation invalid: notes schema at loc [["notes", 0, "summary"]]'
+    assert len(client.calls) == 2
+
+
+def test_final_turn_schema_rejection_is_not_repaired(context, tmp_path):
+    client, gateway = setup(tmp_path, [submit([note(summary='x' * 601)]), submit()])
+    assert_review(run(context, gateway, max_turns=1))
+    assert len(client.calls) == 1
+
+
+def test_repair_forces_submit_and_returns_matching_error(context, tmp_path):
+    invalid = call('submit_notes', {'notes': [note(summary='')]}, id='REJECTED-ID')
+    client, gateway = setup(tmp_path, [invalid, submit()])
+    assert run(context, gateway).notes
+    request = client.calls[1]
+    assert request['toolConfig']['toolChoice'] == {'tool': {'name': 'submit_notes'}}
+    assert request['messages'][-1] == {'role': 'user', 'content': [{'toolResult': {
+        'toolUseId': 'REJECTED-ID', 'status': 'error', 'content': [{'text':
+            'submit_notes was rejected at [["notes", 0, "summary"]]. Resubmit every note. '
+            'Each summary must be non-empty and under 500 characters.'}]}}]}
+
+
+def test_repair_error_redacts_summary_and_unknown_key(context, tmp_path):
+    rejected = note(summary='PRIVATE-SUMMARY' * 100)
+    rejected['PRIVATE-UNKNOWN-KEY'] = 'PRIVATE-VALUE'
+    client, gateway = setup(tmp_path, [submit([rejected]), submit()])
+    assert run(context, gateway).notes
+    error = client.calls[1]['messages'][-1]['content'][0]['toolResult']
+    encoded = json.dumps(error)
+    assert 'PRIVATE' not in encoded
+    assert '<unknown_field>' in encoded
+    assert 'summary' in encoded
+
+
+@pytest.mark.parametrize('notes', [[], [note(finding_index=1)], [note(related_invoices=['UNKNOWN'])]])
+def test_semantic_note_failures_do_not_repair(context, tmp_path, notes):
+    client, gateway = setup(tmp_path, [submit(notes), submit()])
+    assert_review(run(context, gateway))
+    assert len(client.calls) == 1
+
+
+def test_repair_unknown_invoice_still_referred(context, tmp_path):
+    client, gateway = setup(tmp_path, [submit([note(summary='')]),
+                                      submit([note(related_invoices=['UNKNOWN'])])])
+    result = run(context, gateway)
+    assert_review(result)
+    assert result.needs_review.reason == 'investigation invalid: unknown related invoice'
+    assert len(client.calls) == 2
+
+
+def test_gateway_block_during_repair_propagates(context, tmp_path):
+    client, gateway = setup(tmp_path, [submit([note(summary='')]), submit()], budget=Budget(max_calls=1))
+    with pytest.raises(GatewayBlocked):
+        run(context, gateway)
+    assert len(client.calls) == 1

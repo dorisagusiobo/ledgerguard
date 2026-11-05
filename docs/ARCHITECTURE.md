@@ -85,7 +85,11 @@ Invoice PDF → Extractor → Rule checks → Policy checker → Investigator �
    note per finding and never adds, removes or changes findings. Notes may reference only
    invoice numbers from the findings or from tool results in that run. It has at most
    6 model turns and 10 tool calls, and the last turn must submit notes. An unusual
-   amount is not treated as proof of fraud.
+   amount is not treated as proof of fraud. A schema-rejected note submission gets
+   one repair attempt if a model turn remains, with redacted error locations and
+   forced `submit_notes`. The repair uses the existing turn and gateway budgets;
+   a second rejection, wrong note count/index or unknown related invoice goes to
+   human review. Summaries are never truncated.
 5. **Review queue — application code.** Validates findings, amounts, evidence and
    citations, saves them, and shows the page number and exact source text. Version 1
    shows no page image because the database deliberately stores no PDFs.

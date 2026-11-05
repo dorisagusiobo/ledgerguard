@@ -59,6 +59,7 @@ class Investigation:
 class State(TypedDict):
     messages: list[dict]
     turns: int
+    repairs: int
     seen: list[str]
     tool_uses: list[dict]
     outcome: dict | None
@@ -118,7 +119,7 @@ def investigate(invoice: Invoice, findings: list[Finding], *, tools: ReadOnlyToo
 
     def model(state: State):
         turns = state['turns'] + 1
-        choice = {'tool': {'name': 'submit_notes'}} if state['turns'] == max_turns - 1 else {'any': {}}
+        choice = {'tool': {'name': 'submit_notes'}} if state['repairs'] > 0 or state['turns'] == max_turns - 1 else {'any': {}}
         try:
             response = gateway.converse(model_id, {
                 'system': [{'text': SYSTEM_PROMPT}], 'messages': state['messages'],
@@ -186,6 +187,13 @@ def investigate(invoice: Invoice, findings: list[Finding], *, tools: ReadOnlyToo
             locations = [[part if type(part) is int or part in fields else '<unknown_field>'
                           for part in item['loc']]
                          for item in error.errors(include_input=False, include_context=False, include_url=False)]
+            if state['repairs'] == 0 and state['turns'] < max_turns:
+                message = ('submit_notes was rejected at ' + json.dumps(locations)
+                           + '. Resubmit every note. Each summary must be non-empty and under 500 characters.')
+                result = {'toolResult': {'toolUseId': state['tool_uses'][0]['toolUseId'],
+                                         'status': 'error', 'content': [{'text': message}]}}
+                return {'messages': [*state['messages'], {'role': 'user', 'content': [result]}],
+                        'repairs': 1, 'route': 'model'}
             return {'outcome': review('investigation invalid: notes schema at loc ' + json.dumps(locations))}
         except (TypeError, KeyError):
             return {'outcome': review('investigation invalid: notes schema at loc []')}
@@ -203,10 +211,11 @@ def investigate(invoice: Invoice, findings: list[Finding], *, tools: ReadOnlyToo
     graph.add_edge(START, 'model')
     graph.add_conditional_edges('model', lambda s: s['route'], {'finish': 'finish', 'tools': 'tools', 'end': END})
     graph.add_conditional_edges('tools', lambda s: s['route'], {'model': 'model', 'end': END})
-    graph.add_edge('finish', END)
+    graph.add_conditional_edges('finish', lambda s: 'end' if s['outcome'] is not None else s['route'],
+                                {'model': 'model', 'end': END})
     compiled = graph.compile(checkpointer=checkpointer)
     try:
-        result = compiled.invoke({'messages': [initial_message(invoice, findings)], 'turns': 0,
+        result = compiled.invoke({'messages': [initial_message(invoice, findings)], 'turns': 0, 'repairs': 0,
                                   'seen': sorted({invoice.invoice_number} | {number for f in findings for number in f.invoice_numbers}),
                                   'tool_uses': [], 'outcome': None, 'route': 'model'},
                                  config={'recursion_limit': 2 * max_turns + 2,
