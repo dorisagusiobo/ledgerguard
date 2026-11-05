@@ -31,19 +31,19 @@ def test_migrations_idempotent_and_checksum_protected(db_owner, tmp_path):
     assert migrate(db_owner) == []
     initial.unlink()
     # Keep one pending file so the missing-applied-file check is exercised.
-    (initial.parent / '006_pending.sql').write_text('SELECT 1;')
+    (initial.parent / '007_pending.sql').write_text('SELECT 1;')
     with pytest.raises(ValueError, match='missing or changed'):
         migrate(db_owner, initial.parent)
 
 
 def test_pending_migration_ddl_and_history_roll_back(db_owner, tmp_path):
     copytree(MIGRATIONS, tmp_path / 'migrations')
-    (tmp_path / 'migrations/006_broken.sql').write_text(
+    (tmp_path / 'migrations/007_broken.sql').write_text(
         'CREATE TABLE should_rollback (id INTEGER); SELECT definitely_missing_column;')
     with pytest.raises(psycopg.Error):
         migrate(db_owner, tmp_path / 'migrations')
     assert db_owner.execute("SELECT to_regclass('should_rollback')").fetchone()[0] is None
-    assert db_owner.execute("SELECT count(*) FROM schema_migrations WHERE name='006_broken.sql'").fetchone()[0] == 0
+    assert db_owner.execute("SELECT count(*) FROM schema_migrations WHERE name='007_broken.sql'").fetchone()[0] == 0
 
 
 def audit_record():
@@ -285,3 +285,34 @@ def test_save_refuses_mismatched_pipeline_run_id(db_app, saved_result):
         save_run(db_app, result, wrong)
     assert db_app.execute('SELECT count(*) FROM runs WHERE run_id=ANY(%s)',
                           ([metadata.run_id, wrong.run_id],)).fetchone()[0] == 0
+
+
+def test_run_audit_includes_failed_run_without_saved_run(db_app):
+    run_id = uuid4().hex
+    record = {**audit_record(), 'run_id': run_id + ':INV-1'}
+    append_audit(db_app, record)
+    assert db_app.execute('SELECT count(*) FROM runs WHERE run_id=%s', (run_id,)).fetchone() == (0,)
+    assert db_app.execute(
+        'SELECT resolved_run_id, document_id, cost FROM run_audit WHERE resolved_run_id=%s',
+        (run_id,)).fetchall() == [(run_id, 'INV-1', record['cost'])]
+
+
+def test_run_audit_without_colon_has_no_document(db_app):
+    append_audit(db_app, {**audit_record(), 'run_id': 'abc'})
+    assert db_app.execute(
+        "SELECT resolved_run_id, document_id FROM run_audit WHERE run_id='abc'"
+    ).fetchall() == [('abc', None)]
+
+
+def test_run_audit_is_read_only_for_app(db_app):
+    record = audit_record()
+    append_audit(db_app, record)
+    assert db_app.execute('SELECT cost FROM run_audit WHERE run_id=%s',
+                          (record['run_id'],)).fetchone() == (record['cost'],)
+    for command in [
+        'INSERT INTO run_audit (run_id) VALUES (%s)',
+        "UPDATE run_audit SET outcome='changed' WHERE run_id=%s",
+        'DELETE FROM run_audit WHERE run_id=%s',
+    ]:
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            db_app.execute(command, (record['run_id'],))

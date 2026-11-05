@@ -34,6 +34,13 @@ def test_live_run_saved_with_app_role_and_provenance(runtime, db_owner):
     assert dict(db_owner.execute('SELECT document_id, pdf_sha256 FROM documents WHERE run_id=%s', (run_id,))) == hashes
     assert db_owner.execute('SELECT count(*) FROM findings WHERE run_id=%s', (run_id,)).fetchone() == (2,)
     assert db_owner.execute('SELECT count(*) FROM audit_log WHERE run_id LIKE %s', (run_id + ':%',)).fetchone()[0] > 0
+    rows = db_owner.execute(
+        'SELECT document_id, cost, pipeline_run_id FROM run_audit WHERE resolved_run_id=%s',
+        (run_id,)).fetchall()
+    assert len(rows) == db_owner.execute(
+        'SELECT count(*) FROM audit_log WHERE run_id LIKE %s', (run_id + ':%',)).fetchone()[0]
+    assert all(document_id in pdfs and linked_run is None for document_id, _, linked_run in rows)
+    assert sum((cost or Decimal('0') for _, cost, _ in rows), Decimal('0')) == Decimal(result['batch_cost'])
     assert db_owner.execute('SELECT count(*) FROM checkpoints WHERE thread_id LIKE %s', (run_id + ':%',)).fetchone()[0] > 0
 
 
@@ -45,6 +52,9 @@ def test_batch_block_is_saved_as_stopped_without_model_calls(runtime, db_owner):
     assert db_owner.execute('SELECT mode, status, stopped_reason FROM runs WHERE run_id=%s', (result['run_id'],)).fetchone() == (
         'live', 'stopped', 'max_cost_exceeded')
     assert db_owner.execute('SELECT count(*) FROM documents WHERE run_id=%s', (result['run_id'],)).fetchone() == (4,)
+    assert db_owner.execute(
+        'SELECT COALESCE(sum(cost), 0) FROM run_audit WHERE resolved_run_id=%s',
+        (result['run_id'],)).fetchone() == (Decimal('0'),)
 
 
 def test_owner_role_refused_before_model_or_save(runtime, postgres_database, monkeypatch, db_owner):

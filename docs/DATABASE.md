@@ -89,6 +89,17 @@ the recording; they are not new provider charges. Saving never makes review
 decisions or changes accounting records. A duplicate run ID fails rather than
 replacing existing evidence.
 
+## Read a run's audit trail
+
+Migration 006 adds `run_audit`, the app role's read-only view for a run's audit
+trail. Filter by `resolved_run_id`; `document_id` is the second colon-delimited
+part of the audit `run_id`, or NULL when absent. All original audit columns remain
+available. The view prefers `pipeline_run_id` when present (including saved replay
+rows whose recorded prefix differs), then falls back to the audit `run_id` prefix.
+Live rows are written during execution, before the `runs` row exists, so their
+`pipeline_run_id` stays NULL. The view does not join `runs`, so failed runs without
+a saved result remain readable too.
+
 ## Runtime audit and monthly budget
 
 Pass `audit=PostgresSink(APP_DATABASE_URL)` and
