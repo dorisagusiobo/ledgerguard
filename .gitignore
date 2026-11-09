@@ -15,8 +15,8 @@ infra/terraform.tfvars
 infra/.terraform.lock.hcl
 infra/tfplan
 
-# Local extraction audit logs and evaluation reports
-runs/
+# Local extraction audit logs and evaluation reports (root only; web/app/runs/ is app code)
+/runs/
 
 !.env.example
 

@@ -3,6 +3,8 @@ import {render, screen, fireEvent, waitFor} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {FindingView} from '@/components/finding-view';
 import {DecisionForm} from '@/components/decision-form';
+import {findingTypes} from '@/components/common';
+import type {FindingType} from '@/lib/types';
 import {detail} from './fixture';
 describe('evidence review', () => {
   it('renders vendor markup as literal text without executable elements', () => {
@@ -23,6 +25,16 @@ describe('evidence review', () => {
   it('shows the specified no-clause text', () => {
     render(<FindingView detail={{...detail, finding: {...detail.finding, citation: null, no_clause_reason: 'no applicable clause identified'}}} action={async () => ({message: ''})} />);
     expect(screen.getByText('No applicable clause identified')).toBeTruthy();
+  });
+  it('names the finding type and explains it in plain language', () => {
+    render(<FindingView detail={detail} action={async () => ({message: ''})} />);
+    expect(screen.getByRole('heading', {level: 1}).textContent).toBe('Contract overcharge');
+    expect(screen.getByText(findingTypes.contract_overcharge.meaning, {selector: '.type-explainer'})).toBeTruthy();
+  });
+  it('has a name and meaning for every finding type', () => {
+    const types: FindingType[] = ['duplicate', 'contract_overcharge', 'policy_violation', 'split_purchase', 'unusual_amount', 'arithmetic_error', 'extraction_issue'];
+    expect(Object.keys(findingTypes).sort()).toEqual([...types].sort());
+    for (const type of types) expect(findingTypes[type].name && findingTypes[type].meaning).toBeTruthy();
   });
 });
 describe('decision form', () => {

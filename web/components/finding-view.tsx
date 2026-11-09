@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type {FindingDetail} from '@/lib/types';
 import type {DecisionAction} from '@/lib/action-state';
-import {Badge, label, When} from './common';
+import {Badge, findingTypes, When} from './common';
 import {DecisionForm} from './decision-form';
 
 export function FindingView({detail, action}: {detail: FindingDetail; action: DecisionAction}) {
@@ -9,7 +9,7 @@ export function FindingView({detail, action}: {detail: FindingDetail; action: De
   const evidence = new Set(finding.evidence.map(source => source.text));
   return <>
     <nav className="breadcrumb" aria-label="Breadcrumb"><Link href="/">Runs</Link><span>/</span><Link href={`/runs/${encodeURIComponent(finding.run_id)}`}>Review queue</Link><span>/</span><span>Finding {finding.finding_id}</span></nav>
-    <header className="page-heading"><div><p className="eyebrow">Finding {finding.finding_id} · Evidence review</p><h1>{label(finding.type)}</h1><p className="muted invoice-list">{finding.invoice_numbers.join(' · ')}</p></div><Badge status={finding.status} /></header>
+    <header className="page-heading"><div><p className="eyebrow">Finding {finding.finding_id} · Evidence review</p><h1>{findingTypes[finding.type].name}</h1><p className={`type-explainer type-${finding.type}`}>{findingTypes[finding.type].meaning}</p><p className="muted invoice-list">{finding.invoice_numbers.join(' · ')}</p></div><Badge status={finding.status} /></header>
     <div className="finding-layout"><div className="evidence-column">
       <section className="finding-summary" aria-labelledby="what-found"><p className="eyebrow" id="what-found">01 / What was found</p><div className="amount-row"><div><span className="small muted">Amount at issue</span><p className="large-amount">{finding.amount_at_issue}</p></div><div><span className="small muted">Confidence</span><p className="confidence">{(finding.confidence * 100).toFixed(0)}%</p></div></div><p className="quote calculation">{finding.calculation}</p></section>
       <section className="review-section"><h2><span>02</span> The rule</h2>{finding.citation ? <><div className="clause-meta"><strong>{finding.citation.clause_id}</strong><span>{finding.citation.document}</span><span>Version {finding.citation.version}</span></div><blockquote className="quote">{finding.citation.quote}</blockquote></> : <p>No applicable clause identified</p>}</section>
