@@ -6,3 +6,31 @@
 
 .app-header.aws-header {height:auto; min-height:92px; flex-wrap:wrap; padding-top:16px; padding-bottom:16px;}
 @media(max-width:560px) {.app-header.aws-header {min-height:74px;} .reviewer-session {flex-basis:100%; justify-content:space-between;}}
+
+/* Finding types: one accent per type, so a reviewer can scan the queue by kind. */
+.type-duplicate {--tone:#5b4a8a;}
+.type-contract_overcharge {--tone:#8a4a3c;}
+.type-policy_violation {--tone:#7d5718;}
+.type-split_purchase {--tone:#2e5c86;}
+.type-unusual_amount {--tone:#7a456b;}
+.type-arithmetic_error {--tone:#26564b;}
+.type-extraction_issue {--tone:#4f5f58;}
+.finding-cell {min-width:240px; max-width:360px;}
+.finding-link {display:inline-flex; align-items:center; gap:9px; color:var(--tone, var(--ink)); text-transform:none;}
+.finding-link::before {content:''; flex:none; width:8px; height:8px; border-radius:2px; background:var(--tone, var(--green));}
+.type-meaning {font-size:12px; line-height:1.55; color:var(--muted); margin:7px 0 6px 17px;}
+.finding-cell > .small {margin-left:17px;}
+.page-heading h1 + .type-explainer {margin-top:-6px;}
+.type-explainer {max-width:640px; font-size:15px; line-height:1.6; border-left:3px solid var(--tone, var(--green)); padding:2px 0 2px 14px; margin-bottom:14px;}
+.finding-summary {border-top:3px solid var(--green);}
+.review-section h2 > span {color:var(--green);}
+
+/* Phones and tablets: keep the checklist, as a compact card above the evidence. */
+@media(max-width:900px) {
+  .review-guide {display:block; position:static; order:-1; padding:18px 20px; margin-bottom:28px; background:var(--white); border:1px solid var(--line);}
+  .review-guide h2, .review-guide .guide-note {display:none;}
+  .review-guide ol {display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:0 18px; margin:10px 0 0; padding-left:22px;}
+  .review-guide li {padding:4px 0 4px 6px;}
+  .finding-cell {min-width:200px;}
+}
+@media(max-width:560px) {.review-guide ol {grid-template-columns:minmax(0, 1fr);}}
